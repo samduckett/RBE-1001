@@ -1,3 +1,4 @@
+# basic Hello world program
 
 from vex import *
 
