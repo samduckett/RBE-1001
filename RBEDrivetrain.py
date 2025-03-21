@@ -2,7 +2,8 @@ from vex import *
 
 
 class RBEDrivetrain:
-    # constructor for the drivetrain
+    """drivetrain class for RBE 1001, will build on the entire class"""
+
     def __init__(
         self,
         LeftMotor: Motor,
@@ -16,26 +17,26 @@ class RBEDrivetrain:
         self.LeftMotor = LeftMotor
         self.RightMotor = RightMotor
 
-        # the gear ratio on the drive motor
         self.gearRatio = GearRatio
+        """the gear ratio on the drive motor"""
 
-        # the radius of the drive wheels
         self.wheelDiameter = wheelDiameter
+        """the radius of the drive wheels"""
 
-        # how for the robot will move with 1 rotation
         self.wheelCircumference = wheelDiameter * math.PI
+        """how for the robot will move with 1 rotation"""
 
-        # distance from left wheal to right wheel
         self.trackWidth = TrackWidth
+        """distance from left wheal to right wheel"""
 
-        # distance from front to back wheel
         self.wheelbase = Wheelbase
+        """distance from front to back wheel"""
 
-        # hoe Rotations will move the robot 1 inch
         self.rotationsPerInch = 1 / self.wheelCircumference
+        """how Rotations will move the robot 1 inch"""
 
-    # Function to drive BaseBot straight for some number of inches
     def driveStraight(self, Inches: float):
+        """Function to drive BaseBot straight for some number of inches"""
         Velocity = 100
         self.LeftMotor.spin_for(
             FORWARD,
@@ -54,8 +55,8 @@ class RBEDrivetrain:
             True,
         )
 
-    # Function to turn BaseBot for some number of Rotations
     def turnInPlace(self, Rotations: float):
+        """Function to turn BaseBot for some number of Rotations"""
         Velocity = 100
         self.LeftMotor.spin_for(
             REVERSE,
