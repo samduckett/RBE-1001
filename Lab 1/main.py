@@ -12,6 +12,4 @@ right_motor = Motor(Ports.PORT10, 18_1, False)
 
 brain.screen.print("Hellow, World")
 
-drivetrain = RBEDrivetrain(left_motor, right_motor)
-
-drivetrain.set_gear_ratio(5)
+drivetrain = RBEDrivetrain(left_motor, right_motor, 5, 4, 11.0)
