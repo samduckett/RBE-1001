@@ -14,6 +14,8 @@ inverse kinimatics
 up and down button, snaps to hights
 store button
 
+4 bar - 6 bar - easy
+mechi adv charged up style - hard
 ## bindings
 
 forward backword left right - right axis

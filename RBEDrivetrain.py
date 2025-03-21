@@ -1,3 +1,45 @@
+# region VEXcode Generated Robot Configuration
+from vex import *
+import urandom
+
+# Brain should be defined by default
+brain = Brain()
+
+# Robot configuration code
+
+
+# wait for rotation sensor to fully initialize
+wait(30, MSEC)
+
+
+# Make random actually random
+def initializeRandomSeed():
+    wait(100, MSEC)
+    random = (
+        brain.battery.voltage(MV)
+        + brain.battery.current(CurrentUnits.AMP) * 100
+        + brain.timer.system_high_res()
+    )
+    urandom.seed(int(random))
+
+
+# Set random seed
+initializeRandomSeed()
+
+
+def play_vexcode_sound(sound_name):
+    # Helper to make playing sounds from the V5 in VEXcode easier and
+    # keeps the code cleaner by making it clear what is happening.
+    print("VEXPlaySound:" + sound_name)
+    wait(5, MSEC)
+
+
+# add a small delay to make sure we don't print in the middle of the REPL header
+wait(200, MSEC)
+# clear the console to make sure we don't have the REPL in the console
+print("\033[2J")
+
+# endregion VEXcode Generated Robot Configuration
 from vex import *
 
 
@@ -23,11 +65,11 @@ class RBEDrivetrain:
         self.wheelDiameter = wheelDiameter
         """the radius of the drive wheels"""
 
-        self.wheelCircumference = wheelDiameter * math.PI
+        self.wheelCircumference = wheelDiameter * 3.141592
         """how for the robot will move with 1 rotation"""
 
         self.trackWidth = TrackWidth
-        """distance from left wheal to right wheel"""
+        """distance from left Wheel to right wheel"""
 
         self.wheelbase = Wheelbase
         """distance from front to back wheel"""
@@ -74,3 +116,24 @@ class RBEDrivetrain:
             RPM,
             True,
         )
+
+    def turnAroundWheel(self, Rotations: float):
+        Velocity = 100
+        if Rotations > 0:
+            self.LeftMotor.spin_for(
+                FORWARD,
+                Rotations * self.gearRatio * self.trackWidth / self.wheelDiameter * 2,
+                RotationUnits.REV,
+                Velocity,
+                RPM,
+                True,
+            )
+        else:
+            self.RightMotor.spin_for(
+                REVERSE,
+                Rotations * self.gearRatio * self.trackWidth / self.wheelDiameter * 2,
+                RotationUnits.REV,
+                Velocity,
+                RPM,
+                True,
+            )
