@@ -36,7 +36,11 @@ class RBEDrivetrain:
         """how Rotations will move the robot 1 inch"""
 
     def configPIDWallFollow(
-        self, K_P, wallFollowSpeed, frontRangeFinder, rightRangeFInder
+        self,
+        K_P: float,
+        wallFollowSpeed: float,
+        frontRangeFinder: Sonar,
+        rightRangeFInder: Sonar,
     ):
         # 51
         # 10 3/4

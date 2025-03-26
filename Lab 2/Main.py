@@ -24,3 +24,10 @@ brain.screen.print("Hello, World")
 drivetrain = RBEDrivetrain(left_motor, right_motor, 5, 4, 11.0)
 
 drivetrain.configPIDWallFollow(10, 100, frontRangeFinder, rightRangeFInder)
+
+
+# drive forward while 5 in away from a wall, as fast as possible
+# drive forward until robot sees wall 5 in in front of it
+# turn with gyroscope
+
+# prints right and front distens to brain
