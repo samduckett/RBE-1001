@@ -1,6 +1,6 @@
 # region VEXcode Generated Robot Configuration
 from vex import *
-from RBEDrivetrain import *
+from Drivetrin import *
 
 # initialize the brian
 brain = Brain()
