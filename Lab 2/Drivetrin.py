@@ -49,17 +49,17 @@ class RBEDrivetrain:
         self.frontRangeFinder = frontRangeFinder
         self.rightRangeFInder = rightRangeFInder
 
-    def drive(self, speed, direction):
+    def drive(self, speed):
         """drive function - For negative values of direction, the robot turns right, and for positive values of direction, the robot turns left.  For values of direction with small magnitudes, the robot gradually turns.  For values of direction with large magnitudes, the robot turns more quickly."""
-        self.leftMotor.spin(FORWARD, speed * direction, RPM)
-        self.rightMotor.spin(FORWARD, speed * direction, RPM)
+        self.leftMotor.spin(FORWARD, speed, RPM)
+        self.rightMotor.spin(FORWARD, speed, RPM)
 
     def wallFollowInches(self, setDistanceFromWall):
         while self.frontRangeFinder.distance(DistanceUnits.IN) != setDistanceFromWall:
             rightError = setDistanceFromWall - self.frontRangeFinder.distance()
-            self.drive(setDistanceFromWall, -self.K_P * rightError)
+            self.drive(-self.K_P * rightError)
 
-    def driveStraight(self, Inches: float):
+    def driveDistance(self, Inches: float):
         """Function to drive BaseBot straight for some number of inches"""
         Velocity = 100
         self.leftMotor.spin_for(
