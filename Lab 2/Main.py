@@ -62,6 +62,7 @@ class RBEDrivetrain:
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.rotation()
+                mult = kSpeed + kP * error
                 self.motorLeft.spin(FORWARD, -(kSpeed + kP * error), RPM)
                 self.motorRight.spin(FORWARD, (kSpeed + kP * error), RPM)
                 brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
@@ -91,7 +92,7 @@ class RBEDrivetrain:
             )
 
     def driveForwardGyroTillWall(self, wallDist):
-        kP = 1
+        kP = 10
         kSpeed = 170
         goalHeading = self.gyro.rotation()
 
@@ -99,8 +100,8 @@ class RBEDrivetrain:
 
         while self.frontRangeFinder.distance(DistanceUnits.IN) >= wallDist:
             error = goalHeading - self.gyro.rotation()
-            self.motorLeft.spin(FORWARD, (kSpeed + kP * error), RPM)
-            self.motorRight.spin(FORWARD, (kSpeed - kP * error), RPM)
+            self.motorLeft.spin(FORWARD, (kSpeed - kP * error), RPM)
+            self.motorRight.spin(FORWARD, (kSpeed + kP * error), RPM)
             brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
             brain.screen.print_at("error", error, x=40, y=50)
         self.motorLeft.stop(HOLD)
@@ -250,7 +251,7 @@ def part1():
 def part2():
     # spins 90 deg
     rbeDriveTrain.driveForwardGyroTillWall(5)
-    rbeDriveTrain.spin(120, 90, 0, True, True)
+    rbeDriveTrain.spin(120, -90, 0, True, True)
 
 
 def part3():
