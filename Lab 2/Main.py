@@ -126,7 +126,6 @@ class RBEDrivetrain:
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
-
     def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
         while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
             rightError = rightFollowDist - self.rightRangeFinder.distance(
@@ -183,7 +182,8 @@ rbeDriveTrain = RBEDrivetrain(
 def part1():
     rbeDriveTrain.driveForwardUntilDistance(8, 200)
     rbeDriveTrain.driveForwardDist(-2.5, 200, False)
-    rbeDriveTrain.spinAboutWheel(200, 90, "LEFT", false)
+    # rbeDriveTrain.spinAboutWheel(200, 90, "LEFT", false)
+    rbeDriveTrain.spin(200, 90, 1, False)
     rbeDriveTrain.brazeWallUntilDistance(4.2, 52.5, 200, kp)
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
     pass
