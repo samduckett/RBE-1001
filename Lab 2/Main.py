@@ -27,15 +27,21 @@ class RBEDrivetrain:
         self.wheelRotDegPerBodyTurnDeg = (self.wheelTrack * 2) / self.wheelDiameter
 
     def driveLeftMotor(self, speed):
-        """drive function - For negative values of direction, the robot turns right, and for positive values of direction, the robot turns left.  For values of direction with small magnitudes, the robot gradually turns.  For values of direction with large magnitudes, the robot turns more quickly."""
-        self.motorLeft.set_velocity(speed, RPM)
-        self.motorLeft.spin(FORWARD)
+        self.motorLeft.spin(FORWARD, speed, RPM)
 
     def driveRightMotor(self, speed):
-        self.motorRight.set_velocity(speed, RPM)
-        self.motorRight.spin(FORWARD)
+        self.motorRight.spin(FORWARD, speed, RPM)
 
-    def spin(self, speed):
+    def spin(self, speed, deg, rotationCOE):
+        """
+        The Velocity the robot wheels will spin
+        the degrees the robot will rotate
+        rotates the robot around the back wheels, centered around rotationCOE being [-1, 1]
+            where left wheal is -1
+            where right wheal is 1
+            and center is 0
+            with any numbers between being between
+        """
         pass
 
     def spinAboutWheel(self, speed, deg, wheel, pause):
