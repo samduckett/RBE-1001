@@ -11,6 +11,10 @@ class RBEDrivetrain:
         motorLeft: Motor,
         motorRight: Motor,
         gyro: Inertial,
+        
+		lightLeft: Light,
+        lightRight: Light,
+        
     ):
         self.frontRangeFinder = frontRangeFinder
         self.rightRangeFinder = rightRangeFinder
@@ -19,6 +23,8 @@ class RBEDrivetrain:
         self.motorRight = motorRight
 
         self.gyro = gyro
+        self.lightLeft = lightLeft
+        self.lightRight = lightRight
 
         self.driveGearRatio = 5
         self.wheelDiameter = 3
@@ -62,11 +68,11 @@ class RBEDrivetrain:
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.rotation()
-                mult = (kSpeed + abs(kP * error)) * error / abs(error)
-                self.motorLeft.spin(FORWARD, -mult, RPM)
-                self.motorRight.spin(FORWARD, mult, RPM)
+                mult = kSpeed + kP * error
+                self.motorLeft.spin(FORWARD, -(kSpeed + kP * error), RPM)
+                self.motorRight.spin(FORWARD, (kSpeed + kP * error), RPM)
                 brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
-                brain.screen.print_at("mult", mult, x=40, y=50)
+                brain.screen.print_at("error", error, x=40, y=50)
             self.motorLeft.stop(HOLD)
             self.motorRight.stop(HOLD)
         else:
@@ -97,13 +103,13 @@ class RBEDrivetrain:
         goalHeading = self.gyro.rotation()
 
         error = 999
-
-        while self.frontRangeFinder.distance(DistanceUnits.IN) >= wallDist:
+        while abs(error) > 3:  # error less than 3 degrees\
             error = goalHeading - self.gyro.rotation()
-            self.motorLeft.spin(FORWARD, (kSpeed - kP * error), RPM)
-            self.motorRight.spin(FORWARD, (kSpeed + kP * error), RPM)
+            mult = (kSpeed + abs(kP * error)) * error / abs(error)
+            self.motorLeft.spin(FORWARD, -mult, RPM)
+            self.motorRight.spin(FORWARD, mult, RPM)
             brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
-            brain.screen.print_at("error", error, x=40, y=50)
+            brain.screen.print_at("mult", mult, x=40, y=50)
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
@@ -205,6 +211,9 @@ rangeFinderRight = Sonar(brain.three_wire_port.c)
 
 imu = Inertial(Ports.PORT6)
 
+lightLeft = Light(brain.three_wire_port.a)
+lightRight = Light(brain.three_wire_port.b)
+
 # vars
 kp = float(5)
 
@@ -232,6 +241,8 @@ rbeDriveTrain = RBEDrivetrain(
     leftMotor,
     rightMotor,
     imu,
+    lightLeft,
+    lightRight,
 )
 
 arm = Arm(armMotor)
