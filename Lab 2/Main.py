@@ -190,9 +190,7 @@ def part1():
     rbeDriveTrain.spin(200, 90, 1, False)
     rbeDriveTrain.brazeWallUntilDistance(4.2, 52.5, 200, kp)
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
-    pass
 
-part1()
 
 def part2():
     # spins 90 deg
