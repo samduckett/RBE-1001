@@ -55,14 +55,14 @@ class RBEDrivetrain:
         if will use the gyro to true with more accuracy
         """
         if useGyro:
-            kP = 0.5
+            kP = 2.5
             goalHeading = self.gyro.rotation() + deg
 
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.rotation()
-                self.motorLeft.spin(FORWARD, speed + kP * error, RPM)
-                self.motorRight.spin(FORWARD, -(speed + kP * error), RPM)
+                self.motorLeft.spin(FORWARD, -(speed + kP * error), RPM)
+                self.motorRight.spin(FORWARD, (speed + kP * error), RPM)
                 brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
                 brain.screen.print_at("error", error, x=40, y=50)
             self.motorLeft.stop(HOLD)
@@ -232,7 +232,7 @@ def part1():
 
 def part2():
     # spins 90 deg
-    rbeDriveTrain.spin(50, 90, 0, True, True)
+    rbeDriveTrain.spin(120, 90, 0, True, True)
     # # spins -90 degres around left wheal
     # rbeDriveTrain.spin(100, -90, 1)
     # # spinds 90 degrees aroudn right wheal
