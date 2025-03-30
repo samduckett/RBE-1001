@@ -131,7 +131,14 @@ class RBEDrivetrain:
         self.motorRight.stop(HOLD)
 
     def brazeWallForDistane(self, rightFollowDist, dist, speed, kp):
-        self.motorRight.spin_for(FORWARD, self.finalDrive * dist / self.wheelCircumference, TURNS, speed, RPM, False)
+        self.motorRight.spin_for(
+            FORWARD,
+            self.finalDrive * dist / self.wheelCircumference,
+            TURNS,
+            speed,
+            RPM,
+            False,
+        )
         while self.motorRight.is_spinning():
             rightError = rightFollowDist - self.rightRangeFinder.distance(
                 DistanceUnits.IN
@@ -139,7 +146,7 @@ class RBEDrivetrain:
             brain.screen.print_at(
                 "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
             )
-            self.driveLeftMotor( kp * rightError + speed)
+            self.driveLeftMotor(kp * rightError + speed)
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
@@ -160,7 +167,7 @@ brain = Brain()
 
 leftMotor = Motor(Ports.PORT1, 18_1, False)
 rightMotor = Motor(Ports.PORT10, 18_1, True)
-armMotor = Motor(Ports.PORT10, 18_1, True)
+armMotor = Motor(Ports.PORT8, 18_1, True)
 
 rangeFinderFront = Sonar(brain.three_wire_port.e)
 rangeFinderRight = Sonar(brain.three_wire_port.c)
@@ -193,7 +200,7 @@ rbeDriveTrain = RBEDrivetrain(
     imu,
 )
 
-arm = Arm()
+arm = Arm(armMotor)
 
 
 def part1():
@@ -204,7 +211,7 @@ def part1():
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
 
     brain.screen.print("Stopping /n")
-part1()
+
 
 def part2():
     # spins 90 deg
@@ -223,7 +230,7 @@ def part3():
 
 def part4():
     while True:
-        pass
+        arm.log()
 
 
 # ZERO HEADING FOE GYRO
