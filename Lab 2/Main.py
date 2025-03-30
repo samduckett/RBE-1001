@@ -55,20 +55,16 @@ class RBEDrivetrain:
         if will use the gyro to true with more accuracy
         """
         if useGyro:
-            kP = .5
-            goalHeading = self.gyro.heading() + deg
+            kP = 0.5
+            goalHeading = self.gyro.rotation() + deg
 
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
-                error = goalHeading - self.gyro.heading()
+                error = goalHeading - self.gyro.rotation()
                 self.motorLeft.spin(FORWARD, speed + kP * error, RPM)
-                self.motorRight.spin(FORWARD, speed - kP * error, RPM)
-                brain.screen.print_at(
-					"HEADING", self.gyro.heading(), x=40, y=90
-				)
-                brain.screen.print_at(
-					"error", error, x=40, y=50
-				)
+                self.motorRight.spin(FORWARD, -(speed + kP * error), RPM)
+                brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
+                brain.screen.print_at("error", error, x=40, y=50)
             self.motorLeft.stop(HOLD)
             self.motorRight.stop(HOLD)
         else:
@@ -86,7 +82,7 @@ class RBEDrivetrain:
             )
             self.motorRight.spin_for(
                 FORWARD,
-                - motorSpinFor * (1 - rotationCOE),
+                -motorSpinFor * (1 - rotationCOE),
                 DEGREES,
                 speed,
                 RPM,
@@ -100,10 +96,20 @@ class RBEDrivetrain:
 
     def driveForwardDist(self, dist, speed, pause):
         self.motorLeft.spin_for(
-            FORWARD, self.driveGearRatio * dist / self.wheelCircumference, TURNS, speed, RPM, False
+            FORWARD,
+            self.driveGearRatio * dist / self.wheelCircumference,
+            TURNS,
+            speed,
+            RPM,
+            False,
         )
         self.motorRight.spin_for(
-            FORWARD, self.driveGearRatio * dist / self.wheelCircumference, TURNS, speed, RPM, pause
+            FORWARD,
+            self.driveGearRatio * dist / self.wheelCircumference,
+            TURNS,
+            speed,
+            RPM,
+            pause,
         )
 
     # Drive both motors at a set speed
@@ -215,7 +221,7 @@ arm = Arm(armMotor)
 
 def part1():
     rbeDriveTrain.driveForwardUntilDistance(3, 200)
-    #rbeDriveTrain.driveForwardDist(-5.5, 200, True)
+    # rbeDriveTrain.driveForwardDist(-5.5, 200, True)
     rbeDriveTrain.spin(100, 90)
     rbeDriveTrain.brazeWallForDistane(5, 32, 100, kp)
     rbeDriveTrain.spin(100, 90)
