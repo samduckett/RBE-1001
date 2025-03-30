@@ -32,16 +32,26 @@ class RBEDrivetrain:
     def driveRightMotor(self, speed):
         self.motorRight.spin(FORWARD, speed, RPM)
 
-    def spin(self, speed, deg, rotationCOE):
+    def spin(
+        self,
+        speed: float,
+        deg: float,
+        pause: bool = True,
+        rotationCOE: float = 0,
+        useGyro: bool = False,
+    ):
         """
-        The Velocity the robot wheels will spin
-        the degrees the robot will rotate
-        rotates the robot around the back wheels, centered around rotationCOE being [-1, 1]
-            where left wheal is -1
-            where right wheal is 1
-            and center is 0
-            with any numbers between being between
+        The Velocity the robot wheels will spin \n
+        the degrees the robot will rotate \n
+        if the robot will pause until the robot will be compleat, defaults to TRUE
+        rotates the robot around the back wheels, centered around rotationCOE being [-1, 1] \n
+        - where left wheal is -1 \n
+        - where right wheal is 1 \n
+        - and center is 0 \n
+        - with any numbers between being in between \n
+        if will use the gyro to true with more accuracy
         """
+
         pass
 
     def spinAboutWheel(self, speed, deg, wheel, pause):
@@ -131,6 +141,7 @@ leftMotor = Motor(Ports.PORT1, 18_1, False)
 rightMotor = Motor(Ports.PORT10, 18_1, True)
 rangeFinderFront = Sonar(brain.three_wire_port.e)
 rangeFinderRight = Sonar(brain.three_wire_port.c)
+imu = Inertial(6)
 
 # vars
 kp = float(12)
@@ -139,19 +150,24 @@ rightFollowDistance = float(4.3)
 forwardWallDistance = float(5)
 forwardWallDistance2 = float(51)
 
-rbeDriveTrain = RBEDrivetrain(
-    rangeFinderFront,
-    rangeFinderRight,
-    leftMotor,
-    rightMotor,
-)
-
+# config sensors
 brain.screen.print("running /n")
 
 rangeFinderFront.distance(DistanceUnits.IN)
 rangeFinderRight.distance(DistanceUnits.IN)
 
-wait(500)
+imu.calibrate()
+while imu.is_calibrating:
+    wait(5)
+
+# config drivetrain
+rbeDriveTrain = RBEDrivetrain(
+    rangeFinderFront,
+    rangeFinderRight,
+    leftMotor,
+    rightMotor,
+    imu,
+)
 
 
 def part1():
@@ -164,11 +180,13 @@ def part1():
 
 
 def part2():
-    pass
+    rbeDriveTrain.spin("True", 1)
 
 
 def part3():
     pass
 
 
+# ZERO HEADING FOE GYRO
+imu.set_heading(0, DEGREES)
 part2()
