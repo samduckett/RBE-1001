@@ -168,14 +168,13 @@ rbeDriveTrain = RBEDrivetrain(
 
 
 def part1():
-    rbeDriveTrain.driveForwardUntilDistance(8, 200)
-    rbeDriveTrain.driveForwardDist(-2.5, 200, False)
+    rbeDriveTrain.driveForwardUntilDistance(3, 200)
+    rbeDriveTrain.driveForwardDist(-5.5, 200, True)
     # rbeDriveTrain.spinAboutWheel(200, 90, "LEFT", false)
     rbeDriveTrain.spin(200, 90, 1, False)
-    rbeDriveTrain.brazeWallUntilDistance(4.2, 52.5, 200, kp)
+    rbeDriveTrain.brazeWallForDistane(5, 38, 100, kp)
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
-    pass
-
+    brain.screen.print("Stopping /n")
 part1()
 
 def part2():
