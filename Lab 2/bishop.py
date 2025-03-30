@@ -63,6 +63,7 @@ class RBEDrivetrain:
 		self.wheelTrack = wheelTrack
 		self.wheelCircumference = self.wheelDiameter * math.pi
 		self.rotationsPerInch = 1 / self.wheelCircumference
+		self.wheelRotDegPerBodyTurnDeg = ((wheelTrack * 2) / wheelDiameter)
 
 		
 
@@ -76,6 +77,13 @@ class RBEDrivetrain:
 		self.motorRight.set_velocity(speed, RPM)
 		self.motorRight.spin(FORWARD)
 
+	
+	def spinAboutWheel(self, speed, deg, wheel, pause){
+		if wheel == "LEFT":
+			self.motorLeft.spin_for(FORWARD, deg * self.wheelRotDegPerBodyTurnDeg * (deg / abs(deg)), DEGREES, speed, RPM, pause)
+		else if wheel == "RIGHT":
+			self.motorRight.spin_for(FORWARD, deg * self.wheelRotDegPerBodyTurnDeg * (deg / abs(deg)), DEGREES, speed, RPM, pause)
+	}
 	def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
 		while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
 			rightError = rightFollowDist - self.rightRangeFinder.distance(DistanceUnits.IN)
@@ -91,66 +99,66 @@ class RBEDrivetrain:
 	#         rightError = setDistanceFromWall - frontRangeFinder.distance(DistanceUnits.IN)
 	#         drive(-K_P * rightError)
 
-	def driveDistance(self, Inches: float):
-		"""Function to drive BaseBot straight for some number of inches"""
-		Velocity = 100
-		self.motorLeft.spin_for(
-			FORWARD,
-			Inches * self.finalDrive * self.rotationsPerInch,
-			RotationUnits.REV,
-			Velocity,
-			RPM,
-			False,
-		)
-		self.motorRight.spin_for(
-			FORWARD,
-			Inches * self.finalDrive * self.rotationsPerInch,
-			RotationUnits.REV,
-			Velocity,
-			RPM,
-			True,
-		)
+	# def driveDistance(self, Inches: float):
+	# 	"""Function to drive BaseBot straight for some number of inches"""
+	# 	Velocity = 100
+	# 	self.motorLeft.spin_for(
+	# 		FORWARD,
+	# 		Inches * self.finalDrive * self.rotationsPerInch,
+	# 		RotationUnits.REV,
+	# 		Velocity,
+	# 		RPM,
+	# 		False,
+	# 	)
+	# 	self.motorRight.spin_for(
+	# 		FORWARD,
+	# 		Inches * self.finalDrive * self.rotationsPerInch,
+	# 		RotationUnits.REV,
+	# 		Velocity,
+	# 		RPM,
+	# 		True,
+	# 	)
 
-	def turnInPlace(self, Rotations: float):
-		"""Function to turn BaseBot for some number of Rotations"""
-		Velocity = 100
-		self.motorLeft.spin_for(
-			REVERSE,
-			Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter,
-			RotationUnits.REV,
-			Velocity,
-			RPM,
-			False,
-		)
-		self.motorRight.spin_for(
-			FORWARD,
-			Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter,
-			RotationUnits.REV,
-			Velocity,
-			RPM,
-			True,
-		)
+	# def turnInPlace(self, Rotations: float):
+	# 	"""Function to turn BaseBot for some number of Rotations"""
+	# 	Velocity = 100
+	# 	self.motorLeft.spin_for(
+	# 		REVERSE,
+	# 		Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter,
+	# 		RotationUnits.REV,
+	# 		Velocity,
+	# 		RPM,
+	# 		False,
+	# 	)
+	# 	self.motorRight.spin_for(
+	# 		FORWARD,
+	# 		Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter,
+	# 		RotationUnits.REV,
+	# 		Velocity,
+	# 		RPM,
+	# 		True,
+	# 	)
 
-	def turnAroundWheel(self, Rotations: float):
-		Velocity = 100
-		if Rotations > 0:
-			self.motorLeft.spin_for(
-				FORWARD,
-				Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter * 2,
-				RotationUnits.REV,
-				Velocity,
-				RPM,
-				True,
-			)
-		else:
-			self.motorRight.spin_for(
-				REVERSE,
-				Rotations * finalDrive * self.wheelTrack / self.wheelDiameter * 2,
-				RotationUnits.REV,
-				Velocity,
-				RPM,
-				True,
-			)
+	# def turnAroundWheel(self, Rotations: float):
+	# 	Velocity = 100
+	# 	if Rotations > 0:
+	# 		self.motorLeft.spin_for(
+	# 			FORWARD,
+	# 			Rotations * self.finalDrive * self.wheelTrack / self.wheelDiameter * 2,
+	# 			RotationUnits.REV,
+	# 			Velocity,
+	# 			RPM,
+	# 			True,
+	# 		)
+	# 	else:
+	# 		self.motorRight.spin_for(
+	# 			REVERSE,
+	# 			Rotations * finalDrive * self.wheelTrack / self.wheelDiameter * 2,
+	# 			RotationUnits.REV,
+	# 			Velocity,
+	# 			RPM,
+	# 			True,
+	# 		)
 kp = float(12)
 brain=Brain()
 
