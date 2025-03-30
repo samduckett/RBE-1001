@@ -62,9 +62,9 @@ class RBEDrivetrain:
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.rotation()
-                mult = kSpeed + kP * error
-                self.motorLeft.spin(FORWARD, -(kSpeed + kP * error), RPM)
-                self.motorRight.spin(FORWARD, (kSpeed + kP * error), RPM)
+                mult = math.copysign(kSpeed + abs(kP * error), error)
+                self.motorLeft.spin(FORWARD, -mult, RPM)
+                self.motorRight.spin(FORWARD, mult, RPM)
                 brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
                 brain.screen.print_at("error", error, x=40, y=50)
             self.motorLeft.stop(HOLD)
