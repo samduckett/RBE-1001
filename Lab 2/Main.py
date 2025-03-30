@@ -10,12 +10,15 @@ class RBEDrivetrain:
         rightRangeFinder: Sonar,
         motorLeft: Motor,
         motorRight: Motor,
+        gyro: Inertial,
     ):
-
         self.frontRangeFinder = frontRangeFinder
         self.rightRangeFinder = rightRangeFinder
+
         self.motorLeft = motorLeft
         self.motorRight = motorRight
+
+        self.gyro = gyro
 
         self.driveGearRatio = 5
         self.wheelDiameter = 3
@@ -51,6 +54,7 @@ class RBEDrivetrain:
         if will use the gyro to true with more accuracy
         """
         if useGyro:
+            Gyro
             pass
         else:
             self.motorLeft.spin_for(
@@ -72,26 +76,6 @@ class RBEDrivetrain:
                 * self.wheelTrack
                 / self.wheelDiameter
                 * (1 - rotationCOE),
-                DEGREES,
-                speed,
-                RPM,
-                pause,
-            )
-
-    def spinAboutWheel(self, speed, deg, wheel, pause):
-        if wheel == "LEFT":
-            self.motorRight.spin_for(
-                REVERSE,
-                self.driveGearRatio * deg * self.wheelRotDegPerBodyTurnDeg,
-                DEGREES,
-                speed,
-                RPM,
-                pause,
-            )
-        elif wheel == "RIGHT":
-            self.motorLeft.spin_for(
-                REVERSE,
-                self.driveGearRatio * deg * self.wheelRotDegPerBodyTurnDeg,
                 DEGREES,
                 speed,
                 RPM,
