@@ -97,6 +97,16 @@ class RBEDrivetrain:
         self.driveLeftMotor(speed)
         self.driveRightMotor(speed)
 
+    def driveForwardUntilDistance(self, forwardDistWall, speed):
+        while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
+            self.driveForward(speed)
+            brain.screen.print_at(
+                "FRONT SENSOR", rangeFinderFront.distance(DistanceUnits.IN), x=40, y=40
+            )
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
+
+
     def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
         while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
             rightError = rightFollowDist - self.rightRangeFinder.distance(
@@ -145,6 +155,11 @@ wait(500)
 
 
 def part1():
+    rbeDriveTrain.driveForwardUntilDistance(8, 200)
+    rbeDriveTrain.driveForwardDist(-2.5, 200, False)
+    rbeDriveTrain.spinAboutWheel(200, 90, "LEFT", false)
+    rbeDriveTrain.brazeWallUntilDistance(4.2, 52.5, 200, kp)
+    rbeDriveTrain.driveForwardUntilDistance(30, 200)
     pass
 
 
