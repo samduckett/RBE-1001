@@ -54,16 +54,24 @@ class RBEDrivetrain:
         if will use the gyro to true with more accuracy
         """
         if useGyro:
-            Gyro
-            pass
+            kP = 5
+            goalHeading = self.gyro.heading() + deg
+
+            error = 999
+            while abs(error) < 3:  # error less than 3 degrees
+                error = goalHeading - self.gyro.heading()
+                self.motorLeft.spin(FORWARD, speed + kP * error, RPM)
+                self.motorRight.spin(FORWARD, speed - kP * error, RPM)
+            self.motorLeft.stop(HOLD)
+            self.motorRight.stop(HOLD)
         else:
+            motorSpinFor = (
+                deg * self.driveGearRatio * self.wheelTrack / self.wheelDiameter
+            )
+
             self.motorLeft.spin_for(
                 FORWARD,
-                deg
-                * self.driveGearRatio
-                * self.wheelTrack
-                / self.wheelDiameter
-                * (1 + rotationCOE),
+                motorSpinFor * (1 + rotationCOE),
                 DEGREES,
                 speed,
                 RPM,
@@ -71,11 +79,7 @@ class RBEDrivetrain:
             )
             self.motorRight.spin_for(
                 FORWARD,
-                -deg
-                * self.driveGearRatio
-                * self.wheelTrack
-                / self.wheelDiameter
-                * (1 - rotationCOE),
+                motorSpinFor * (1 - rotationCOE),
                 DEGREES,
                 speed,
                 RPM,
