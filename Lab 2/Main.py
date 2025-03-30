@@ -17,14 +17,13 @@ class RBEDrivetrain:
         self.motorLeft = motorLeft
         self.motorRight = motorRight
 
-        self.finalDrive = 5
+        self.driveGearRatio = 5
         self.wheelDiameter = 3
         self.wheelBase = 8
         self.wheelTrack = 10.25
 
         self.wheelCircumference = self.wheelDiameter * math.pi
-        self.rotationsPerInch = 1 / self.wheelCircumference
-        self.wheelRotDegPerBodyTurnDeg = (self.wheelTrack * 2) / self.wheelDiameter
+        self.degPerInch = 360 / self.wheelCircumference
 
     def driveLeftMotor(self, speed):
         self.motorLeft.spin(FORWARD, speed, RPM)
@@ -36,29 +35,54 @@ class RBEDrivetrain:
         self,
         speed: float,
         deg: float,
-        pause: bool = True,
         rotationCOE: float = 0,
+        pause: bool = True,
         useGyro: bool = False,
     ):
         """
         The Velocity the robot wheels will spin \n
         the degrees the robot will rotate \n
-        if the robot will pause until the robot will be compleat, defaults to TRUE
-        rotates the robot around the back wheels, centered around rotationCOE being [-1, 1] \n
-        - where left wheal is -1 \n
-        - where right wheal is 1 \n
+        rotates the robot around the back wheels, centered around rotationCOE being [-1, 1], default to 0\n
+        - where right wheal is -1 \n
+        - where left wheal is 1 \n
         - and center is 0 \n
         - with any numbers between being in between \n
+        if the robot will pause until the robot will be compleat, defaults to TRUE
         if will use the gyro to true with more accuracy
         """
-
-        pass
+        if useGyro:
+            pass
+        else:
+            self.motorLeft.spin_for(
+                FORWARD,
+                deg
+                * self.driveGearRatio
+                * self.wheelTrack
+                / self.wheelDiameter
+                * (1 + rotationCOE),
+                DEGREES,
+                speed,
+                RPM,
+                False,
+            )
+            self.motorRight.spin_for(
+                FORWARD,
+                -deg
+                * self.driveGearRatio
+                * self.wheelTrack
+                / self.wheelDiameter
+                * (1 - rotationCOE),
+                DEGREES,
+                speed,
+                RPM,
+                pause,
+            )
 
     def spinAboutWheel(self, speed, deg, wheel, pause):
         if wheel == "LEFT":
             self.motorRight.spin_for(
                 REVERSE,
-                self.finalDrive * deg * self.wheelRotDegPerBodyTurnDeg,
+                self.driveGearRatio * deg * self.wheelRotDegPerBodyTurnDeg,
                 DEGREES,
                 speed,
                 RPM,
@@ -67,42 +91,28 @@ class RBEDrivetrain:
         elif wheel == "RIGHT":
             self.motorLeft.spin_for(
                 REVERSE,
-                self.finalDrive * deg * self.wheelRotDegPerBodyTurnDeg,
+                self.driveGearRatio * deg * self.wheelRotDegPerBodyTurnDeg,
                 DEGREES,
                 speed,
                 RPM,
                 pause,
             )
 
-    def spinInPlace(self, speed, deg, pause):
-        self.motorLeft.spin_for(
-            FORWARD,
-            self.finalDrive * deg / 2 * self.wheelRotDegPerBodyTurnDeg,
-            DEGREES,
-            speed,
-            RPM,
-            False,
-        )
-        self.motorRight.spin_for(
-            FORWARD,
-            -self.finalDrive * deg / 2 * self.wheelRotDegPerBodyTurnDeg,
-            DEGREES,
-            speed,
-            RPM,
-            pause,
-        )
-
     # Drive both motors for a set distance in inches
-        # where dist is distance desired, can also be negative
-        # where speed is motor RPM
-        # where pause is whether or not following code should be executed or wait until finished
+    # where dist is distance desired, can also be negative
+    # where speed is motor RPM
+    # where pause is whether or not following code should be executed or wait until finished
 
     def driveForwardDist(self, dist, speed, pause):
-        self.motorLeft.spin_for(FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, False)
-        self.motorRight.spin_for(FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, pause)
+        self.motorLeft.spin_for(
+            FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, False
+        )
+        self.motorRight.spin_for(
+            FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, pause
+        )
 
     # Drive both motors at a set speed
-        # where speed is motor RPM
+    # where speed is motor RPM
     def driveForward(self, speed):
         self.driveLeftMotor(speed)
         self.driveRightMotor(speed)
@@ -165,7 +175,14 @@ def part1():
 
 
 def part2():
-    rbeDriveTrain.spin("True", 1)
+    # spins 90 deg
+    rbeDriveTrain.spin(100, 90)
+    # spins -90 degres around left wheal
+    rbeDriveTrain.spin(100, -90, 1)
+    # spinds 90 degrees aroudn right wheal
+    rbeDriveTrain.spin(100, 90, -1)
+    # spins -90 degrees around .75 left wheal
+    rbeDriveTrain.spin(100, -90, 0.75)
 
 
 def part3():
