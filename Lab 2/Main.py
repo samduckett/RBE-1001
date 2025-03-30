@@ -55,14 +55,20 @@ class RBEDrivetrain:
         if will use the gyro to true with more accuracy
         """
         if useGyro:
-            kP = 5
+            kP = .5
             goalHeading = self.gyro.heading() + deg
 
             error = 999
-            while abs(error) < 3:  # error less than 3 degrees
+            while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.heading()
                 self.motorLeft.spin(FORWARD, speed + kP * error, RPM)
                 self.motorRight.spin(FORWARD, speed - kP * error, RPM)
+                brain.screen.print_at(
+					"HEADING", self.gyro.heading(), x=40, y=90
+				)
+                brain.screen.print_at(
+					"error", error, x=40, y=50
+				)
             self.motorLeft.stop(HOLD)
             self.motorRight.stop(HOLD)
         else:
@@ -80,7 +86,7 @@ class RBEDrivetrain:
             )
             self.motorRight.spin_for(
                 FORWARD,
-                -motorSpinFor * (1 - rotationCOE),
+                - motorSpinFor * (1 - rotationCOE),
                 DEGREES,
                 speed,
                 RPM,
@@ -183,14 +189,17 @@ forwardWallDistance = float(5)
 forwardWallDistance2 = float(51)
 
 # config sensors
-brain.screen.print("running /n")
+brain.screen.print("Calibrating \n")
+
 
 rangeFinderFront.distance(DistanceUnits.IN)
 rangeFinderRight.distance(DistanceUnits.IN)
 
-# imu.calibrate()
-# while imu.is_calibrating():
-#     wait(5)
+imu.calibrate()
+while imu.is_calibrating():
+    wait(5)
+
+brain.screen.print("Finished Calibrating \n")
 
 # config drivetrain
 rbeDriveTrain = RBEDrivetrain(
@@ -206,17 +215,18 @@ arm = Arm(armMotor)
 
 def part1():
     rbeDriveTrain.driveForwardUntilDistance(3, 200)
-    rbeDriveTrain.driveForwardDist(-5.5, 200, True)
-    rbeDriveTrain.spin(200, 90, 1, False)
+    #rbeDriveTrain.driveForwardDist(-5.5, 200, True)
+    rbeDriveTrain.spin(100, 90)
     rbeDriveTrain.brazeWallForDistane(5, 38, 100, kp)
-    rbeDriveTrain.driveForwardUntilDistance(30, 200)
+    rbeDriveTrain.spin(100, 90)
+    rbeDriveTrain.driveForwardUntilDistance(40, 200)
 
     brain.screen.print("Stopping /n")
 
 
 def part2():
     # spins 90 deg
-    rbeDriveTrain.spin(100, 90)
+    rbeDriveTrain.spin(50, 90, 0, True, True)
     # # spins -90 degres around left wheal
     # rbeDriveTrain.spin(100, -90, 1)
     # # spinds 90 degrees aroudn right wheal
@@ -235,5 +245,5 @@ def part4():
 
 
 # ZERO HEADING FOE GYRO
-# imu.set_heading(0, DEGREES)
-part2()
+imu.set_heading(0, DEGREES)
+part1()
