@@ -130,6 +130,19 @@ class RBEDrivetrain:
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
+    def brazeWallForDistane(self, rightFollowDist, dist, speed, kp):
+        self.motorRight.spin_for(FORWARD, self.finalDrive * dist / self.wheelCircumference, TURNS, speed, RPM, False)
+        while self.motorRight.is_spinning():
+            rightError = rightFollowDist - self.rightRangeFinder.distance(
+                DistanceUnits.IN
+            )
+            brain.screen.print_at(
+                "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
+            )
+            self.driveLeftMotor( kp * rightError + speed)
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
+
 
 class Arm:
     def __init__(self, armMotor: Motor):
@@ -186,7 +199,6 @@ arm = Arm()
 def part1():
     rbeDriveTrain.driveForwardUntilDistance(3, 200)
     rbeDriveTrain.driveForwardDist(-5.5, 200, True)
-    # rbeDriveTrain.spinAboutWheel(200, 90, "LEFT", false)
     rbeDriveTrain.spin(200, 90, 1, False)
     rbeDriveTrain.brazeWallForDistane(5, 38, 100, kp)
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
