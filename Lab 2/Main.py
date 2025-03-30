@@ -82,6 +82,21 @@ class RBEDrivetrain:
             pause,
         )
 
+    # Drive both motors for a set distance in inches
+        # where dist is distance desired, can also be negative
+        # where speed is motor RPM
+        # where pause is whether or not following code should be executed or wait until finished
+
+    def driveForwardDist(self, dist, speed, pause):
+        self.motorLeft.spin_for(FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, False)
+        self.motorRight.spin_for(FORWARD, dist / self.wheelCircumference, TURNS, speed, RPM, pause)
+
+    # Drive both motors at a set speed
+        # where speed is motor RPM
+    def driveForward(self, speed):
+        self.driveLeftMotor(speed)
+        self.driveRightMotor(speed)
+
     def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
         while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
             rightError = rightFollowDist - self.rightRangeFinder.distance(
