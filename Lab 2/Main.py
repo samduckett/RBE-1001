@@ -241,4 +241,4 @@ def part3():
     pass
 
 
-part1()
+part2()
