@@ -12,6 +12,8 @@ class RBEDrivetrain:
         wheelDiameter: float = 1,
         TrackWidth: float = 1,
         Wheelbase: float = 1,
+
+    
     ):
 
         self.leftMotor = LeftMotor
@@ -35,12 +37,19 @@ class RBEDrivetrain:
         self.rotationsPerInch = 1 / self.wheelCircumference
         """how Rotations will move the robot 1 inch"""
 
+
+
+
+
     def configPIDWallFollow(
         self,
         K_P: float,
         wallFollowSpeed: float,
         frontRangeFinder: Sonar,
         rightRangeFInder: Sonar,
+        RightFollowDistance: float = 4.3,
+        ForwardWallDistance: float = 10.5,
+        ForwardWallDistance2: float = 51
     ):
         # 51
         # 10 3/4
@@ -48,6 +57,15 @@ class RBEDrivetrain:
         self.wallFollowSpeed = wallFollowSpeed
         self.frontRangeFinder = frontRangeFinder
         self.rightRangeFInder = rightRangeFInder
+
+        self.rightFollowDistance = RightFollowDistance
+        """Distance to follow on right side, lab step 1"""
+
+        self.forwardWallDistance = ForwardWallDistance
+        """Distance required to move to next step"""
+
+        self.forwardWallDistance2 = ForwardWallDistance2
+        """Distance required to move to the last step"""
 
     def drive(self, speed):
         """drive function - For negative values of direction, the robot turns right, and for positive values of direction, the robot turns left.  For values of direction with small magnitudes, the robot gradually turns.  For values of direction with large magnitudes, the robot turns more quickly."""
