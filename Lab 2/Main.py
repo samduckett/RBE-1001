@@ -249,13 +249,8 @@ def part1():
 
 def part2():
     # spins 90 deg
+    rbeDriveTrain.driveForwardGyroTillWall(5)
     rbeDriveTrain.spin(120, 90, 0, True, True)
-    # # spins -90 degres around left wheal
-    # rbeDriveTrain.spin(100, -90, 1)
-    # # spinds 90 degrees aroudn right wheal
-    # rbeDriveTrain.spin(100, 90, -1)
-    # # spins -90 degrees around .75 left wheal
-    # rbeDriveTrain.spin(100, -90, 0.75)
 
 
 def part3():
