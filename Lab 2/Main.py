@@ -23,8 +23,9 @@ class RBEDrivetrain:
         self.driveGearRatio = 5
         self.wheelDiameter = 3
         self.wheelBase = 8
-        self.wheelTrack = 10.25
+        self.wheelTrack = 9
 
+        self.wheelRotDegPerBodyTurnDeg = self.wheelTrack / self.wheelDiameter
         self.wheelCircumference = self.wheelDiameter * math.pi
         self.degPerInch = 360 / self.wheelCircumference
 
@@ -79,7 +80,7 @@ class RBEDrivetrain:
             )
             self.motorRight.spin_for(
                 FORWARD,
-                motorSpinFor * (1 - rotationCOE),
+                -motorSpinFor * (1 - rotationCOE),
                 DEGREES,
                 speed,
                 RPM,
@@ -133,7 +134,7 @@ class RBEDrivetrain:
     def brazeWallForDistane(self, rightFollowDist, dist, speed, kp):
         self.motorRight.spin_for(
             FORWARD,
-            self.finalDrive * dist / self.wheelCircumference,
+            self.driveGearRatio * dist / self.wheelCircumference,
             TURNS,
             speed,
             RPM,
@@ -187,9 +188,9 @@ brain.screen.print("running /n")
 rangeFinderFront.distance(DistanceUnits.IN)
 rangeFinderRight.distance(DistanceUnits.IN)
 
-imu.calibrate()
-while imu.is_calibrating:
-    wait(5)
+# imu.calibrate()
+# while imu.is_calibrating():
+#     wait(5)
 
 # config drivetrain
 rbeDriveTrain = RBEDrivetrain(
@@ -216,12 +217,12 @@ def part1():
 def part2():
     # spins 90 deg
     rbeDriveTrain.spin(100, 90)
-    # spins -90 degres around left wheal
-    rbeDriveTrain.spin(100, -90, 1)
-    # spinds 90 degrees aroudn right wheal
-    rbeDriveTrain.spin(100, 90, -1)
-    # spins -90 degrees around .75 left wheal
-    rbeDriveTrain.spin(100, -90, 0.75)
+    # # spins -90 degres around left wheal
+    # rbeDriveTrain.spin(100, -90, 1)
+    # # spinds 90 degrees aroudn right wheal
+    # rbeDriveTrain.spin(100, 90, -1)
+    # # spins -90 degrees around .75 left wheal
+    # rbeDriveTrain.spin(100, -90, 0.75)
 
 
 def part3():
@@ -234,5 +235,5 @@ def part4():
 
 
 # ZERO HEADING FOE GYRO
-imu.set_heading(0, DEGREES)
+# imu.set_heading(0, DEGREES)
 part2()
