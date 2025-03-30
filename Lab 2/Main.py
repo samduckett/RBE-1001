@@ -131,13 +131,27 @@ class RBEDrivetrain:
         self.motorRight.stop(HOLD)
 
 
+class Arm:
+    def __init__(self, armMotor: Motor):
+        self.armMotor = armMotor
+
+    def goToSetPoint(self, position):
+        pass
+
+    def log(self):
+        pass
+
+
 # configs
 brain = Brain()
 
 leftMotor = Motor(Ports.PORT1, 18_1, False)
 rightMotor = Motor(Ports.PORT10, 18_1, True)
+armMotor = Motor(Ports.PORT10, 18_1, True)
+
 rangeFinderFront = Sonar(brain.three_wire_port.e)
 rangeFinderRight = Sonar(brain.three_wire_port.c)
+
 imu = Inertial(6)
 
 # vars
@@ -166,6 +180,8 @@ rbeDriveTrain = RBEDrivetrain(
     imu,
 )
 
+arm = Arm()
+
 
 def part1():
     rbeDriveTrain.driveForwardUntilDistance(3, 200)
@@ -174,6 +190,7 @@ def part1():
     rbeDriveTrain.spin(200, 90, 1, False)
     rbeDriveTrain.brazeWallForDistane(5, 38, 100, kp)
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
+
     brain.screen.print("Stopping /n")
 part1()
 
@@ -190,6 +207,11 @@ def part2():
 
 def part3():
     pass
+
+
+def part4():
+    while True:
+        pass
 
 
 # ZERO HEADING FOE GYRO
