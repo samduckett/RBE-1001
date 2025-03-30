@@ -192,6 +192,7 @@ def part1():
     rbeDriveTrain.driveForwardUntilDistance(30, 200)
     pass
 
+part1()
 
 def part2():
     # spins 90 deg
