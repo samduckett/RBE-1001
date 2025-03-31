@@ -24,20 +24,14 @@ class RBEDrivetrain:
         self.lightLeft = lightLeft
         self.lightRight = lightRight
 
-        self.driveGearRatio = 5
+        self.driveGearRatio = 1
         self.wheelDiameter = 3
         self.wheelBase = 8
-        self.wheelTrack = 9
+        self.wheelTrack = 11
 
         self.wheelRotDegPerBodyTurnDeg = self.wheelTrack / self.wheelDiameter
         self.wheelCircumference = self.wheelDiameter * math.pi
         self.degPerInch = 360 / self.wheelCircumference
-
-    def driveLeftMotor(self, speed):
-        self.motorLeft.spin(FORWARD, speed, RPM)
-
-    def driveRightMotor(self, speed):
-        self.motorRight.spin(FORWARD, speed, RPM)
 
     def spin(
         self,
@@ -60,14 +54,13 @@ class RBEDrivetrain:
         """
         if useGyro:
             kP = 2.5
-            kSpeed = 120
+            kSpeed = 25
             goalHeading = self.gyro.rotation() + deg
 
             error = 999
             while abs(error) > 3:  # error less than 3 degrees\
                 error = goalHeading - self.gyro.rotation()
-                if error != 0:
-                    mult = (kSpeed + abs(kP * error)) * error / abs(error)
+                mult = math.copysign(kSpeed + abs(kP * error), error)
                 self.motorLeft.spin(FORWARD, -mult, RPM)
                 self.motorRight.spin(FORWARD, mult, RPM)
                 brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
@@ -96,19 +89,74 @@ class RBEDrivetrain:
                 pause,
             )
 
-    def driveForwardGyroTillWall(self, wallDist):
-        kP = 10
-        kSpeed = 170
+    def driveForwardTillWall(self, wallDist, frontSensor: bool = True):
+        kP_gyro = 1
+        kP_wall = 7.5
+
+        kSpeed = 10
+
         goalHeading = self.gyro.rotation()
 
-        error = 999
-        while abs(error) > 3:  # error less than 3 degrees\
-            error = goalHeading - self.gyro.rotation()
-            mult = (kSpeed + abs(kP * error)) * error / abs(error)
-            self.motorLeft.spin(FORWARD, -mult, RPM)
-            self.motorRight.spin(FORWARD, mult, RPM)
+        GyroError = 999
+        distError = 999
+
+        while abs(distError) >= 1:
+
+            # error
+            if frontSensor:
+                distError = self.frontRangeFinder.distance(DistanceUnits.IN) - wallDist
+            else:
+                distError = self.rightRangeFinder.distance(DistanceUnits.IN) - wallDist
+
+            GyroError = goalHeading - self.gyro.rotation()
+
+            self.motorLeft.spin(
+                FORWARD, kSpeed + distError * kP_wall - kP_gyro * GyroError, RPM
+            )
+            self.motorRight.spin(
+                FORWARD, kSpeed + distError * kP_wall + kP_gyro * GyroError, RPM
+            )
+
+            # Logging
             brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
-            brain.screen.print_at("mult", mult, x=40, y=50)
+            brain.screen.print_at(
+                "Dist",
+                distError,
+                x=40,
+                y=110,
+            )
+            brain.screen.print_at("error", GyroError, x=40, y=50)
+
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
+
+    def driveForwardGyroTillWall(self, wallDist, frontSensor: bool = True):
+        kP_wall = 7.5
+
+        kSpeed = 10
+
+        distError = 999
+
+        while abs(distError) >= 1:
+
+            # error
+            if frontSensor:
+                distError = self.frontRangeFinder.distance(DistanceUnits.IN) - wallDist
+            else:
+                distError = self.rightRangeFinder.distance(DistanceUnits.IN) - wallDist
+
+            self.motorLeft.spin(FORWARD, kSpeed + distError * kP_wall, RPM)
+            self.motorRight.spin(FORWARD, kSpeed + distError * kP_wall, RPM)
+
+            # Logging
+            brain.screen.print_at("rotation", self.gyro.rotation(), x=40, y=90)
+            brain.screen.print_at(
+                "Dist",
+                distError,
+                x=40,
+                y=110,
+            )
+
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
@@ -135,56 +183,56 @@ class RBEDrivetrain:
             pause,
         )
 
-    # Drive both motors at a set speed
-    # where speed is motor RPM
-    def driveForward(self, speed):
-        self.driveLeftMotor(speed)
-        self.driveRightMotor(speed)
+    # # Drive both motors at a set speed
+    # # where speed is motor RPM
+    # def driveForward(self, speed):
+    #     self.driveLeftMotor(speed)
+    #     self.driveRightMotor(speed)
 
-    def driveForwardUntilDistance(self, forwardDistWall, speed):
-        while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
-            self.driveForward(speed)
-            brain.screen.print_at(
-                "FRONT SENSOR", rangeFinderFront.distance(DistanceUnits.IN), x=40, y=40
-            )
-        self.motorLeft.stop(HOLD)
-        self.motorRight.stop(HOLD)
+    # def driveForwardUntilDistance(self, forwardDistWall, speed):
+    #     while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
+    #         self.driveForward(speed)
+    #         brain.screen.print_at(
+    #             "FRONT SENSOR", rangeFinderFront.distance(DistanceUnits.IN), x=40, y=40
+    #         )
+    #     self.motorLeft.stop(HOLD)
+    #     self.motorRight.stop(HOLD)
 
-    def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
-        while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
-            rightError = rightFollowDist - self.rightRangeFinder.distance(
-                DistanceUnits.IN
-            )
-            brain.screen.print_at(
-                "FRONT SENSOR", rangeFinderFront.distance(DistanceUnits.IN), x=40, y=40
-            )
-            brain.screen.print_at(
-                "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
-            )
-            self.driveRightMotor(speed)
-            self.driveLeftMotor(kp * rightError + speed)
-        self.motorLeft.stop(HOLD)
-        self.motorRight.stop(HOLD)
+    # def brazeWallUntilDistance(self, rightFollowDist, forwardDistWall, speed, kp):
+    #     while self.frontRangeFinder.distance(DistanceUnits.IN) >= forwardDistWall:
+    #         rightError = rightFollowDist - self.rightRangeFinder.distance(
+    #             DistanceUnits.IN
+    #         )
+    #         brain.screen.print_at(
+    #             "FRONT SENSOR", rangeFinderFront.distance(DistanceUnits.IN), x=40, y=40
+    #         )
+    #         brain.screen.print_at(
+    #             "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
+    #         )
+    #         self.driveRightMotor(speed)
+    #         self.driveLeftMotor(kp * rightError + speed)
+    #     self.motorLeft.stop(HOLD)
+    #     self.motorRight.stop(HOLD)
 
-    def brazeWallForDistane(self, rightFollowDist, dist, speed, kp):
-        self.motorRight.spin_for(
-            FORWARD,
-            self.driveGearRatio * dist / self.wheelCircumference,
-            TURNS,
-            speed,
-            RPM,
-            False,
-        )
-        while self.motorRight.is_spinning():
-            rightError = rightFollowDist - self.rightRangeFinder.distance(
-                DistanceUnits.IN
-            )
-            brain.screen.print_at(
-                "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
-            )
-            self.driveLeftMotor(kp * rightError + speed)
-        self.motorLeft.stop(HOLD)
-        self.motorRight.stop(HOLD)
+    # def brazeWallForDistane(self, rightFollowDist, dist, speed, kp):
+    #     self.motorRight.spin_for(
+    #         FORWARD,
+    #         self.driveGearRatio * dist / self.wheelCircumference,
+    #         TURNS,
+    #         speed,
+    #         RPM,
+    #         False,
+    #     )
+    #     while self.motorRight.is_spinning():
+    #         rightError = rightFollowDist - self.rightRangeFinder.distance(
+    #             DistanceUnits.IN
+    #         )
+    #         brain.screen.print_at(
+    #             "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
+    #         )
+    #         self.driveLeftMotor(kp * rightError + speed)
+    #     self.motorLeft.stop(HOLD)
+    #     self.motorRight.stop(HOLD)
 
 
 class Arm:
@@ -212,13 +260,6 @@ imu = Inertial(Ports.PORT6)
 
 lightLeft = Light(brain.three_wire_port.a)
 lightRight = Light(brain.three_wire_port.b)
-
-# vars
-kp = float(5)
-
-rightFollowDistance = float(4.3)
-forwardWallDistance = float(5)
-forwardWallDistance2 = float(51)
 
 # config sensors
 brain.screen.print("Calibrating \n")
@@ -248,20 +289,20 @@ arm = Arm(armMotor)
 
 
 def part1():
-    rbeDriveTrain.driveForwardUntilDistance(3, 200)
-    # rbeDriveTrain.driveForwardDist(-5.5, 200, True)
+    rbeDriveTrain.driveForwardTillWall(7)
     rbeDriveTrain.spin(100, 90)
-    rbeDriveTrain.brazeWallForDistane(5, 32, 100, kp)
+    rbeDriveTrain.driveForwardTillWall(50)
     rbeDriveTrain.spin(100, 90)
-    rbeDriveTrain.driveForwardDist(16, 200, False)
-
-    brain.screen.print("Stopping /n")
+    rbeDriveTrain.driveForwardDist(13, 200, True)
 
 
 def part2():
     # spins 90 deg
-    rbeDriveTrain.driveForwardGyroTillWall(5)
+    rbeDriveTrain.driveForwardGyroTillWall(7)
     rbeDriveTrain.spin(120, -90, 0, True, True)
+    rbeDriveTrain.driveForwardGyroTillWall(50)
+    rbeDriveTrain.spin(120, -90, 0, True, True)
+    rbeDriveTrain.driveForwardDist(10, 200, True)
 
 
 def part3():
@@ -275,4 +316,4 @@ def part4():
 
 # ZERO HEADING FOE GYRO
 imu.set_heading(0, DEGREES)
-part2()
+part1()
