@@ -274,6 +274,7 @@ class RBEDrivetrain:
         self.motorRight.stop(HOLD)
 
     def driveAlongLine(self, speed):
+        pass
 
 
 
