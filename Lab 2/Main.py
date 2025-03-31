@@ -51,8 +51,9 @@ class RBEDrivetrain:
         motorLeft: Motor,
         motorRight: Motor,
         gyro: Inertial,
-        lightLeft: Light,
-        lightRight: Light,
+        lineLeft: Line,
+        lineRight: Line,
+        bumperButton1: Bumper,
     ):
         self.frontRangeFinder = frontRangeFinder
         self.rightRangeFinder = rightRangeFinder
@@ -61,8 +62,10 @@ class RBEDrivetrain:
         self.motorRight = motorRight
 
         self.gyro = gyro
-        self.lightLeft = lightLeft
-        self.lightRight = lightRight
+        self.lineLeft = lineLeft
+        self.lineRight = lineRight
+
+        self.bumperButton1 = bumperButton1
 
         self.finalDrive = 5
         self.wheelDiameter = 3
@@ -273,8 +276,68 @@ class RBEDrivetrain:
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
-    def driveAlongLine(self, speed):
-        pass
+    def driveAlongLineUntilEnd(self, speed):
+            leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+            rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+            wait(500)
+            kp = .5
+            while(self.lineLeft.reflectivity(PercentUnits.PERCENT) > 15 or self.lineRight.reflectivity(PercentUnits.PERCENT) > 15):
+                brain.screen.print_at(
+                    "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
+                )
+                brain.screen.print_at(
+                    "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
+                )
+                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+
+                self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
+                self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
+            self.motorLeft.stop(HOLD)
+            self.motorRight.stop(HOLD)
+
+    def driveAlongLineUntilWall(self, speed, wallDist):
+            leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+            rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+            wait(500)
+            kp = .5
+            while(self.frontRangeFinder.distance(DistanceUnits.IN) >= wallDist):
+                brain.screen.print_at(
+                    "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
+                )
+                brain.screen.print_at(
+                    "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
+                )
+                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+
+                self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
+                self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
+            self.motorLeft.stop(HOLD)
+            self.motorRight.stop(HOLD)
+
+    def driveAlongLineUntilWallReverse(self, speed, wallDist):
+            leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+            rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+            wait(500)
+            kp = .1
+            while(self.frontRangeFinder.distance(DistanceUnits.IN) <= wallDist):
+                # brain.screen.print_at(
+                #     "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
+                # )
+                # brain.screen.print_at(
+                #     "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
+                # )
+                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+
+                self.motorRight.spin(REVERSE, speed - rightError * kp, RPM)
+                self.motorLeft.spin(REVERSE, speed - leftError * kp, RPM)
+            self.motorLeft.stop(HOLD)
+            self.motorRight.stop(HOLD)
+
+                
+
 
 
 
@@ -301,8 +364,10 @@ rangeFinderRight = Sonar(brain.three_wire_port.c)
 
 imu = Inertial(Ports.PORT6)
 
-lightLeft = Light(brain.three_wire_port.a)
-lightRight = Light(brain.three_wire_port.b)
+lineLeft = Line(brain.three_wire_port.b)
+lineRight = Line(brain.three_wire_port.a)
+
+bumperButton1 = Bumper(brain.three_wire_port.g)
 
 # vars
 kp = float(2.5)
@@ -317,7 +382,6 @@ brain.screen.print("Calibrating \n")
 
 rangeFinderFront.distance(DistanceUnits.IN)
 rangeFinderRight.distance(DistanceUnits.IN)
-
 imu.calibrate()
 while imu.is_calibrating():
     wait(5)
@@ -331,8 +395,9 @@ rbeDriveTrain = RBEDrivetrain(
     leftMotor,
     rightMotor,
     imu,
-    lightLeft,
-    lightRight,
+    lineLeft,
+    lineRight,
+    bumperButton1
 )
 
 arm = Arm(armMotor)
@@ -366,7 +431,17 @@ def part2():
 
 
 def part3():
-    pass
+    rbeDriveTrain.driveAlongLineUntilEnd(150)
+    rbeDriveTrain.driveForwardUntilWallGyro(3, 150)
+    rbeDriveTrain.spin(120, -90, 0, True, True)
+    rbeDriveTrain.driveAlongLineUntilWall(150, 5)
+    rbeDriveTrain.driveAlongLineUntilWallReverse(150, 35)
+    rbeDriveTrain.spin(100, -90, 0, False, True)
+    rbeDriveTrain.driveForwardDist(15,150,False)
+
+    # brain.screen.print("Stopping Run /n")
+
+    # rbeDriveTrain.driveAlongLineUntilWallReverse(100, 35)
 
 
 def part4():
@@ -376,4 +451,11 @@ def part4():
 
 # ZERO HEADING FOE GYRO
 imu.set_heading(0, DEGREES)
+while (not rbeDriveTrain.bumperButton1.pressing()):
+    wait(5)
 part2()
+while (not rbeDriveTrain.bumperButton1.pressing()):
+    wait(5)
+part3()
+while (not rbeDriveTrain.bumperButton1.pressing()):
+    wait(5)
