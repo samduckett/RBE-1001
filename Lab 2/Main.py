@@ -376,6 +376,8 @@ rightFollowDistance = float(4.3)
 forwardWallDistance = float(5)
 forwardWallDistance2 = float(51)
 
+armMotorSlop = 5
+armFinalDrive = 5
 # config sensors
 brain.screen.print("Calibrating \n")
 
@@ -404,15 +406,16 @@ arm = Arm(armMotor)
 
 
 def part1():
-    #rbeDriveTrain.brazeWallUntilDistance(4, 3, 100, kp)
-    rbeDriveTrain.driveForwardUntilDistance(3, 200)
-    # rbeDriveTrain.driveForwardDist(-5.5, 200, True)
-    rbeDriveTrain.spin(100, 90)
-    rbeDriveTrain.brazeWallUntilDistance(5, 34, 100, kp)
-    rbeDriveTrain.spin(100, 90)
-    rbeDriveTrain.driveForwardDist(16, 200, False)
+    # #rbeDriveTrain.brazeWallUntilDistance(4, 3, 100, kp)
+    # rbeDriveTrain.driveForwardUntilDistance(3, 200)
+    # # rbeDriveTrain.driveForwardDist(-5.5, 200, True)
+    # rbeDriveTrain.spin(100, 90)
+    # rbeDriveTrain.brazeWallUntilDistance(5, 34, 100, kp)
+    # rbeDriveTrain.spin(100, 90)
+    # rbeDriveTrain.driveForwardDist(16, 200, False)
 
-    brain.screen.print("Stopping /n")
+    # brain.screen.print("Stopping /n")
+    pass
 
 
 def part2():
@@ -445,17 +448,40 @@ def part3():
 
 
 def part4():
+    arm.armMotor.reset_position()
     while True:
-        arm.log()
+        brain.screen.print_at("Motor Current", arm.armMotor.current(), x=40, y=50)
+        brain.screen.print_at("Motor Position", arm.armMotor.position(), x=40, y=70)
+        brain.screen.print_at("Motor Temperature", arm.armMotor.temperature(), x=40, y=90)
+        brain.screen.print_at("Motor Torque", arm.armMotor.torque(), x=40, y=110)
+        if rbeDriveTrain.bumperButton1.pressing() and (arm.armMotor.position() - (45 * armFinalDrive) >= -armMotorSlop and arm.armMotor.position() - (45 * armFinalDrive) <= armMotorSlop):
+            wait(50)
+            arm.armMotor.spin_to_position(0, DEGREES, 50, RPM)
+        elif rbeDriveTrain.bumperButton1.pressing() and (arm.armMotor.position() >= -armMotorSlop and arm.armMotor.position() <= armMotorSlop):
+            wait(50)
+            arm.armMotor.spin_to_position(45 * armFinalDrive, DEGREES, 50, RPM)
+
+
 
 
 # ZERO HEADING FOE GYRO
-imu.set_heading(0, DEGREES)
 while (not rbeDriveTrain.bumperButton1.pressing()):
     wait(5)
+part1()
+while (not rbeDriveTrain.bumperButton1.pressing()):
+    wait(5)
+imu.set_heading(0, DEGREES)
+wait(50)
 part2()
 while (not rbeDriveTrain.bumperButton1.pressing()):
     wait(5)
 part3()
+
+rbeDriveTrain.motorLeft.stop(COAST)
+rbeDriveTrain.motorRight.stop(COAST)
+brain.screen.print_at("MOVE ARM TO BE PARALLEL WITH GROUND", arm.armMotor.current(), x=40, y=20)
+brain.screen.print_at("THEN PRESS BUMPER", arm.armMotor.current(), x=40, y=40)
 while (not rbeDriveTrain.bumperButton1.pressing()):
     wait(5)
+wait(500)
+part4()
