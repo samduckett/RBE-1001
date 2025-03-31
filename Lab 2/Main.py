@@ -435,7 +435,7 @@ def part2():
 
 def part3():
     rbeDriveTrain.driveAlongLineUntilEnd(150)
-    rbeDriveTrain.driveForwardUntilWallGyro(3, 150)
+    rbeDriveTrain.driveForwardUntilWallGyro(2, 150)
     rbeDriveTrain.spin(120, -90, 0, True, True)
     rbeDriveTrain.driveAlongLineUntilWall(150, 5)
     rbeDriveTrain.driveAlongLineUntilWallReverse(150, 35)
