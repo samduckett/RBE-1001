@@ -428,7 +428,7 @@ def part2():
 
     # rbeDriveTrain.driveForwardUntilWallGyro(30, 150)
     # rbeDriveTrain.spin(100, -90, 0, False, True)
-    rbeDriveTrain.driveForwardDist(15,150,False)
+    rbeDriveTrain.driveForwardDist(15,150,True)
     brain.screen.print("Stopping Run /n")
     
 
@@ -440,7 +440,8 @@ def part3():
     rbeDriveTrain.driveAlongLineUntilWall(150, 5)
     rbeDriveTrain.driveAlongLineUntilWallReverse(150, 35)
     rbeDriveTrain.spin(100, -90, 0, False, True)
-    rbeDriveTrain.driveForwardDist(15,150,False)
+    wait(500)
+    rbeDriveTrain.driveForwardDist(15,150, True)
 
     # brain.screen.print("Stopping Run /n")
 
