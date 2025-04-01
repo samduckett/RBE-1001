@@ -1,46 +1,48 @@
 from vex import *
 
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# Last comit befor i nuke this repo to get lab 1 do
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#DO NOT CHANGE VARIABLE NAMES
-#DO NOT ADJUST PARAMETERS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# DO NOT CHANGE VARIABLE NAMES
+# DO NOT ADJUST PARAMETERS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#ONLY ADD DEFINITIONS
+# ONLY ADD DEFINITIONS
 
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#DO NOT CHANGE VARIABLE NAMES
-#DO NOT ADJUST PARAMETERS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# DO NOT CHANGE VARIABLE NAMES
+# DO NOT ADJUST PARAMETERS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#ONLY ADD DEFINITIONS
+# ONLY ADD DEFINITIONS
 
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#DO NOT CHANGE VARIABLE NAMES
-#DO NOT ADJUST PARAMETERS
-#DO NOT TOUCH ANY DEFINITIONS
-#DO NOT TOUCH ANY DEFINITIONS
+# DO NOT CHANGE VARIABLE NAMES
+# DO NOT ADJUST PARAMETERS
+# DO NOT TOUCH ANY DEFINITIONS
+# DO NOT TOUCH ANY DEFINITIONS
 
-#ONLY ADD DEFINITIONS
+
+# ONLY ADD DEFINITIONS
 class RBEDrivetrain:
     """drivetrain class for RBE 1001, will build on the entire class"""
 
@@ -118,9 +120,7 @@ class RBEDrivetrain:
             self.motorLeft.stop(HOLD)
             self.motorRight.stop(HOLD)
         else:
-            motorSpinFor = (
-                deg * self.finalDrive * self.wheelTrack / self.wheelDiameter
-            )
+            motorSpinFor = deg * self.finalDrive * self.wheelTrack / self.wheelDiameter
 
             self.motorLeft.spin_for(
                 FORWARD,
@@ -162,8 +162,7 @@ class RBEDrivetrain:
         wallError = 999
         wait(500)
 
-        
-        while (wallError > wallDist):
+        while wallError > wallDist:
             wallError = self.frontRangeFinder.distance(DistanceUnits.IN) - wallDist
             currentHeading = self.gyro.rotation()
             headingError = goalHeading - currentHeading
@@ -176,7 +175,6 @@ class RBEDrivetrain:
             brain.screen.print_at("wallError ", wallError, x=40, y=130)
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
-
 
     def driveReverseUntilWallGyro(self, wallDist, speed):
         kpHeading = 10
@@ -186,8 +184,7 @@ class RBEDrivetrain:
         speed = -speed
         wait(500)
 
-        
-        while (wallError < 0):
+        while wallError < 0:
             wallError = self.frontRangeFinder.distance(DistanceUnits.IN) - wallDist
             currentHeading = self.gyro.rotation()
             headingError = goalHeading - currentHeading
@@ -200,7 +197,6 @@ class RBEDrivetrain:
             brain.screen.print_at("wallError ", wallError, x=40, y=130)
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
-        
 
     # Drive both motors for a set distance in inches
     # where dist is distance desired, can also be negative
@@ -272,73 +268,84 @@ class RBEDrivetrain:
             brain.screen.print_at(
                 "RIGHT SENSOR", rangeFinderRight.distance(DistanceUnits.IN), x=40, y=90
             )
-            self.driveLeftMotor(kp * rightError +  speed)
+            self.driveLeftMotor(kp * rightError + speed)
         self.motorLeft.stop(HOLD)
         self.motorRight.stop(HOLD)
 
     def driveAlongLineUntilEnd(self, speed):
+        leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+        rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+        wait(500)
+        kp = 0.5
+        while (
+            self.lineLeft.reflectivity(PercentUnits.PERCENT) > 15
+            or self.lineRight.reflectivity(PercentUnits.PERCENT) > 15
+        ):
+            brain.screen.print_at(
+                "left line sensor",
+                self.lineLeft.reflectivity(PercentUnits.PERCENT),
+                x=40,
+                y=90,
+            )
+            brain.screen.print_at(
+                "right line sensor",
+                self.lineRight.reflectivity(PercentUnits.PERCENT),
+                x=40,
+                y=50,
+            )
             leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
             rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
-            wait(500)
-            kp = .5
-            while(self.lineLeft.reflectivity(PercentUnits.PERCENT) > 15 or self.lineRight.reflectivity(PercentUnits.PERCENT) > 15):
-                brain.screen.print_at(
-                    "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
-                )
-                brain.screen.print_at(
-                    "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
-                )
-                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
-                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
 
-                self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
-                self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
-            self.motorLeft.stop(HOLD)
-            self.motorRight.stop(HOLD)
+            self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
+            self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
 
     def driveAlongLineUntilWall(self, speed, wallDist):
+        leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+        rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+        wait(500)
+        kp = 0.5
+        while self.frontRangeFinder.distance(DistanceUnits.IN) >= wallDist:
+            brain.screen.print_at(
+                "left line sensor",
+                self.lineLeft.reflectivity(PercentUnits.PERCENT),
+                x=40,
+                y=90,
+            )
+            brain.screen.print_at(
+                "right line sensor",
+                self.lineRight.reflectivity(PercentUnits.PERCENT),
+                x=40,
+                y=50,
+            )
             leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
             rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
-            wait(500)
-            kp = .5
-            while(self.frontRangeFinder.distance(DistanceUnits.IN) >= wallDist):
-                brain.screen.print_at(
-                    "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
-                )
-                brain.screen.print_at(
-                    "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
-                )
-                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
-                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
 
-                self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
-                self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
-            self.motorLeft.stop(HOLD)
-            self.motorRight.stop(HOLD)
+            self.motorRight.spin(FORWARD, speed - rightError * kp, RPM)
+            self.motorLeft.spin(FORWARD, speed - leftError * kp, RPM)
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
 
     def driveAlongLineUntilWallReverse(self, speed, wallDist):
+        leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
+        rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
+        wait(500)
+        kp = 0.1
+        while self.frontRangeFinder.distance(DistanceUnits.IN) <= wallDist:
+            # brain.screen.print_at(
+            #     "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
+            # )
+            # brain.screen.print_at(
+            #     "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
+            # )
             leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
             rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
-            wait(500)
-            kp = .1
-            while(self.frontRangeFinder.distance(DistanceUnits.IN) <= wallDist):
-                # brain.screen.print_at(
-                #     "left line sensor", self.lineLeft.reflectivity(PercentUnits.PERCENT), x=40, y=90
-                # )
-                # brain.screen.print_at(
-                #     "right line sensor", self.lineRight.reflectivity(PercentUnits.PERCENT), x=40, y=50
-                # )
-                leftError = 100 - self.lineLeft.reflectivity(PercentUnits.PERCENT)
-                rightError = 100 - self.lineRight.reflectivity(PercentUnits.PERCENT)
 
-                self.motorRight.spin(REVERSE, speed - rightError * kp, RPM)
-                self.motorLeft.spin(REVERSE, speed - leftError * kp, RPM)
-            self.motorLeft.stop(HOLD)
-            self.motorRight.stop(HOLD)
-
-                
-
-
+            self.motorRight.spin(REVERSE, speed - rightError * kp, RPM)
+            self.motorLeft.spin(REVERSE, speed - leftError * kp, RPM)
+        self.motorLeft.stop(HOLD)
+        self.motorRight.stop(HOLD)
 
 
 class Arm:
@@ -399,7 +406,7 @@ rbeDriveTrain = RBEDrivetrain(
     imu,
     lineLeft,
     lineRight,
-    bumperButton1
+    bumperButton1,
 )
 
 arm = Arm(armMotor)
@@ -428,9 +435,8 @@ def part2():
 
     # rbeDriveTrain.driveForwardUntilWallGyro(30, 150)
     # rbeDriveTrain.spin(100, -90, 0, False, True)
-    rbeDriveTrain.driveForwardDist(15,150,True)
+    rbeDriveTrain.driveForwardDist(15, 150, True)
     brain.screen.print("Stopping Run /n")
-    
 
 
 def part3():
@@ -441,7 +447,7 @@ def part3():
     rbeDriveTrain.driveAlongLineUntilWallReverse(150, 35)
     rbeDriveTrain.spin(100, -90, 0, False, True)
     wait(500)
-    rbeDriveTrain.driveForwardDist(15,150, True)
+    rbeDriveTrain.driveForwardDist(15, 150, True)
 
     # brain.screen.print("Stopping Run /n")
 
@@ -453,36 +459,44 @@ def part4():
     while True:
         brain.screen.print_at("Motor Current", arm.armMotor.current(), x=40, y=50)
         brain.screen.print_at("Motor Position", arm.armMotor.position(), x=40, y=70)
-        brain.screen.print_at("Motor Temperature", arm.armMotor.temperature(), x=40, y=90)
+        brain.screen.print_at(
+            "Motor Temperature", arm.armMotor.temperature(), x=40, y=90
+        )
         brain.screen.print_at("Motor Torque", arm.armMotor.torque(), x=40, y=110)
-        if rbeDriveTrain.bumperButton1.pressing() and (arm.armMotor.position() - (45 * armFinalDrive) >= -armMotorSlop and arm.armMotor.position() - (45 * armFinalDrive) <= armMotorSlop):
+        if rbeDriveTrain.bumperButton1.pressing() and (
+            arm.armMotor.position() - (45 * armFinalDrive) >= -armMotorSlop
+            and arm.armMotor.position() - (45 * armFinalDrive) <= armMotorSlop
+        ):
             wait(50)
             arm.armMotor.spin_to_position(0, DEGREES, 50, RPM)
-        elif rbeDriveTrain.bumperButton1.pressing() and (arm.armMotor.position() >= -armMotorSlop and arm.armMotor.position() <= armMotorSlop):
+        elif rbeDriveTrain.bumperButton1.pressing() and (
+            arm.armMotor.position() >= -armMotorSlop
+            and arm.armMotor.position() <= armMotorSlop
+        ):
             wait(50)
             arm.armMotor.spin_to_position(45 * armFinalDrive, DEGREES, 50, RPM)
 
 
-
-
 # ZERO HEADING FOE GYRO
-while (not rbeDriveTrain.bumperButton1.pressing()):
+while not rbeDriveTrain.bumperButton1.pressing():
     wait(5)
 part1()
-while (not rbeDriveTrain.bumperButton1.pressing()):
+while not rbeDriveTrain.bumperButton1.pressing():
     wait(5)
 imu.set_heading(0, DEGREES)
 wait(50)
 part2()
-while (not rbeDriveTrain.bumperButton1.pressing()):
+while not rbeDriveTrain.bumperButton1.pressing():
     wait(5)
 part3()
 
 rbeDriveTrain.motorLeft.stop(COAST)
 rbeDriveTrain.motorRight.stop(COAST)
-brain.screen.print_at("MOVE ARM TO BE PARALLEL WITH GROUND", arm.armMotor.current(), x=40, y=20)
+brain.screen.print_at(
+    "MOVE ARM TO BE PARALLEL WITH GROUND", arm.armMotor.current(), x=40, y=20
+)
 brain.screen.print_at("THEN PRESS BUMPER", arm.armMotor.current(), x=40, y=40)
-while (not rbeDriveTrain.bumperButton1.pressing()):
+while not rbeDriveTrain.bumperButton1.pressing():
     wait(5)
 wait(500)
 part4()
