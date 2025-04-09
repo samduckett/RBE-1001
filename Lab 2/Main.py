@@ -378,4 +378,4 @@ def part4():
             armMotor.spin_to_position(45 * armFinalDrive, DEGREES, 50, RPM)
 
 
-part3()
+part4()
