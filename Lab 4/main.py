@@ -4,6 +4,10 @@ from vex import *
 # Brain should be defined by default
 brain = Brain()
 
+leftMotor = Motor(Ports.PORT1, 18_1, False)
+rightMotor = Motor(Ports.PORT10, 18_1, True)
+
+
 greenFruit = Colordesc(1, 15, 202, 113, 18, 0.25)
 
 AiVision = AiVision(Ports.PORT14, greenFruit)
@@ -13,10 +17,17 @@ def objectSize(camWidth, objWidth):
     pass
 
 
-def DetectObject():
+def driveForward(speed):
+    leftMotor.spin(FORWARD, speed, RPM)
+    rightMotor.spin(FORWARD, speed, RPM)
 
-    # takes a snapshot and searches for SIG_3_RED_BALL
-    # you’ll want to use the signature that you defined above
+
+def spin(speed):
+    leftMotor.spin(FORWARD, speed, RPM)
+    rightMotor.spin(FORWARD, speed, RPM)
+
+
+def DetectObject():
 
     objects = AiVision.take_snapshot(greenFruit)
 
@@ -37,7 +48,37 @@ def DetectObject():
         wait(90)
         brain.screen.clear_screen()
 
+    return objects
+
+
+def part1():
+    # inches away from fruit that the robot will get to
+    goalDistanceAway = 5
+    kPDistanceAway = 50
+
+    while True:
+
+        objects = AiVision.take_snapshot(greenFruit)
+
+        if objects:
+            fruitDistance = objectSize(objects[0].width)
+
+            # to close negative, to far positive
+            error = fruitDistance - goalDistanceAway
+
+            speed = error * kPDistanceAway
+
+            # max speed
+            maxSpeed = 170
+            if speed > maxSpeed:
+                speed = maxSpeed
+            elif speed < -maxSpeed:
+                speed = -maxSpeed
+
+            driveForward(speed)
+
+        wait(10)
+
 
 while True:
-    DetectObject()
-    wait(10)
+    objectSize()
