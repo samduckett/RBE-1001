@@ -1,5 +1,6 @@
 # region VEXcode Generated Robot Configuration
 from vex import *
+import math
 
 # Brain should be defined by default
 brain = Brain()
@@ -12,9 +13,19 @@ greenFruit = Colordesc(1, 15, 202, 113, 18, 0.25)
 
 AiVision = AiVision(Ports.PORT14, greenFruit)
 
+camWidth = 320
+camHeight = 240
+camVertFOV = 68
+camHorizFOV = 74
+ObjectWidthIn = 3.5
+degPerPixel = camWidth / camHorizFOV
 
-def objectSize(camWidth, objWidth):
-    pass
+
+def objectDist(pixelWidth):
+    angularWidth = degPerPixel * pixelWidth
+    return (ObjectWidthIn*.5) / math.tan(angularWidth * .5)
+
+    
 
 
 def driveForward(speed):
