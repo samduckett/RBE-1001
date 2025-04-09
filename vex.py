@@ -5435,7 +5435,7 @@ class AiObjdesc:
         pass
 
 
-class aiVision:
+class AiVision:
     """### AI Vision class - a class for working with the AI Vision sensor
 
     #### Arguments:
