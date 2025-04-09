@@ -1,5 +1,47 @@
 # region VEXcode Generated Robot Configuration
 from vex import *
+import urandom
+
+# Brain should be defined by default
+brain = Brain()
+
+# Robot configuration code
+
+
+# wait for rotation sensor to fully initialize
+wait(30, MSEC)
+
+
+# Make random actually random
+def initializeRandomSeed():
+    wait(100, MSEC)
+    random = (
+        brain.battery.voltage(MV)
+        + brain.battery.current(CurrentUnits.AMP) * 100
+        + brain.timer.system_high_res()
+    )
+    urandom.seed(int(random))
+
+
+# Set random seed
+initializeRandomSeed()
+
+
+def play_vexcode_sound(sound_name):
+    # Helper to make playing sounds from the V5 in VEXcode easier and
+    # keeps the code cleaner by making it clear what is happening.
+    print("VEXPlaySound:" + sound_name)
+    wait(5, MSEC)
+
+
+# add a small delay to make sure we don't print in the middle of the REPL header
+wait(200, MSEC)
+# clear the console to make sure we don't have the REPL in the console
+print("\033[2J")
+
+# endregion VEXcode Generated Robot Configuration
+# region VEXcode Generated Robot Configuration
+from vex import *
 import math
 
 # Brain should be defined by default
@@ -9,23 +51,22 @@ leftMotor = Motor(Ports.PORT1, 18_1, False)
 rightMotor = Motor(Ports.PORT10, 18_1, True)
 
 
-greenFruit = Colordesc(1, 15, 202, 113, 18, 0.25)
-
-AiVision = AiVision(Ports.PORT14, greenFruit)
+greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
+orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
+yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
+aiVision = AiVision(Ports.PORT14, greenFruit, orangeFruit, yellowFruit)
 
 camWidth = 320
 camHeight = 240
 camVertFOV = 68
 camHorizFOV = 74
 ObjectWidthIn = 3.5
-degPerPixel = camWidth / camHorizFOV
+degPerPixel = camHorizFOV / camWidth
 
 
 def objectDist(pixelWidth):
     angularWidth = degPerPixel * pixelWidth
-    return (ObjectWidthIn*.5) / math.tan(angularWidth * .5)
-
-    
+    return (ObjectWidthIn * 0.5) / math.tan(math.radians(angularWidth * 0.5))
 
 
 def driveForward(speed):
@@ -34,45 +75,50 @@ def driveForward(speed):
 
 
 def spin(speed):
-    leftMotor.spin(FORWARD, speed, RPM)
+    leftMotor.spin(REVERSE, speed, RPM)
     rightMotor.spin(FORWARD, speed, RPM)
 
 
 def DetectObject():
 
-    objects = AiVision.take_snapshot(greenFruit)
+    objects = aiVision.take_snapshot(greenFruit)
 
     # print the coordinates of the center of the object
 
     if objects:
-        print(
-            "x:",
-            AiVision.largest_object().centerX,
-            "   y:",
-            AiVision.largest_object().centerY,
-            "   width:",
-            AiVision.largest_object().width,
-        )
-        brain.screen.print_at("x: ", AiVision.largest_object().centerX, x=50, y=40)
-        brain.screen.print_at("   y:", AiVision.largest_object().centerY, x=150, y=40)
-        brain.screen.print_at("  width:", AiVision.largest_object().width, x=250, y=40)
-        wait(90)
-        brain.screen.clear_screen()
-
-    return objects
+        while True:
+            print(
+                "x:",
+                aiVision.largest_object().centerX,
+                "   y:",
+                aiVision.largest_object().centerY,
+                "   width:",
+                aiVision.largest_object().width,
+            )
+            brain.screen.print_at("x: ", aiVision.largest_object().centerX, x=50, y=40)
+            brain.screen.print_at(
+                "   y:", aiVision.largest_object().centerY, x=150, y=40
+            )
+            brain.screen.print_at(
+                "  width:", aiVision.largest_object().width, x=250, y=40
+            )
+            brain.screen.clear_screen()
+            wait(90)
+            brain.screen.clear_screen()
+            wait(10)
 
 
 def part1():
     # inches away from fruit that the robot will get to
     goalDistanceAway = 5
-    kPDistanceAway = 50
+    kPDistanceAway = 65
 
     while True:
 
-        objects = AiVision.take_snapshot(greenFruit)
+        objects = aiVision.take_snapshot(greenFruit)
 
         if objects:
-            fruitDistance = objectSize(objects[0].width)
+            fruitDistance = objectDist(objects[0].width)
 
             # to close negative, to far positive
             error = fruitDistance - goalDistanceAway
@@ -86,10 +132,98 @@ def part1():
             elif speed < -maxSpeed:
                 speed = -maxSpeed
 
+            brain.screen.print_at("objectDist: ", fruitDistance, x=40, y=50)
+            brain.screen.print_at("speed: ", speed, x=40, y=70)
+            brain.screen.print_at("objectWidth", objects[0].width, x=40, y=90)
+
             driveForward(speed)
+        else:
+            pass
+            driveForward(0)
+        wait(100)
 
-        wait(10)
+
+def part2():
+
+    kPRotation = 0.9
+
+    while True:
+
+        objects = aiVision.take_snapshot((greenFruit, orangeFruit, yellowFruit))
+
+        if objects:
+            rot = objects[0].centerX
+
+            # to close negative, to far positive
+            error = rot - camWidth / 2
+
+            speed = error * kPRotation
+
+            # max speed
+            maxSpeed = 170
+            if speed > maxSpeed:
+                speed = maxSpeed
+            elif speed < -maxSpeed:
+                speed = -maxSpeed
+
+            brain.screen.print_at("objectDist: ", rot, x=40, y=50)
+            brain.screen.print_at("speed: ", speed, x=40, y=70)
+            brain.screen.print_at("objectWidth", objects[0].width, x=40, y=90)
+
+            spin(speed)
+        else:
+            driveForward(0)
+        wait(100)
 
 
-while True:
-    objectSize()
+def part3():
+
+    kPRotation = 0.9
+    goalDistanceAway = 10
+    kPDistanceAway = 65
+
+    while True:
+        objects = []
+        for o in aiVision.take_snapshot(greenFruit):
+            objects.append(o)
+        for o in aiVision.take_snapshot(orangeFruit):
+            objects.append(o)
+        for o in aiVision.take_snapshot(yellowFruit):
+            objects.append(o)
+
+        if objects:
+            rot = objects[0].centerX
+            fruitDistance = objectDist(objects[0].width)
+
+            errorRot = rot - camWidth / 2
+            # to close negative, to far positive
+            errorDit = fruitDistance - goalDistanceAway
+
+            speedFW = errorDit * kPDistanceAway
+            speedRot = errorRot * kPRotation
+            # max speed
+            maxSpeed = 170
+            if speedFW > maxSpeed:
+                speedFW = maxSpeed
+            elif speedFW < -maxSpeed:
+                speedFW = -maxSpeed
+
+            maxSpeedRot = 170
+            if speedRot > maxSpeedRot:
+                speedRot = maxSpeedRot
+            elif speedRot < -maxSpeedRot:
+                speedRot = -maxSpeedRot
+
+            brain.screen.print_at("dist: ", fruitDistance, x=40, y=30)
+            brain.screen.print_at("rot: ", rot, x=40, y=50)
+            brain.screen.print_at("speed: ", speedFW, x=40, y=70)
+            brain.screen.print_at("objectWidth", objects[0].width, x=40, y=90)
+
+            rightMotor.spin(FORWARD, speedFW + speedRot, RPM)
+            leftMotor.spin(FORWARD, speedFW - speedRot, RPM)
+        else:
+            driveForward(0)
+        wait(100)
+
+
+part3()
