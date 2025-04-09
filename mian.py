@@ -44,20 +44,19 @@ class PID:
         self.tolerance = tolerance
 
         # internal state
-        self.last_error = 0.0
+        self.lastError = 0.0
         self.integral = 0.0
         self.lastTime = 0
 
-    def set_setpoint(self, newSetpoint):
-        """Change the target setpoint and reset I/D"""
+    def setSetpoint(self, newSetpoint):
         self.setpoint = newSetpoint
         self.integral = 0.0
-        self.last_error = 0.0
+        self.lastError = 0.0
 
-    def update(self, measured, dt, setpoint=None):
-        """
-        Compute the PID output.
-        """
+    def update(self, measured, setpoint=None):
+        dt = Timer.system() - self.lastTime
+        self.lastTime = Timer.system()
+
         if setpoint is not None:
             self.setpoint = setpoint
 
@@ -71,24 +70,32 @@ class PID:
         I = self.Ki * self.integral
 
         # D term
-        derivative = (error - self.last_error) / dt if dt > 0 else 0.0
+        derivative = (error - self.lastError) / dt if dt > 0 else 0.0
         D = self.Kd * derivative
 
         # store for next cycle for D
-        self.last_error = error
+        self.lastError = error
 
         return P + I + D
+
+    def at_goal(self, measured_value):
+        return abs(self.setpoint - measured_value) <= self.tolerance
 
 
 # Initial Robot
 brain = Brain()
 
 leftFrontMotor = Motor(Ports.PORT1, 18_1, False)
+rightFrontMotor = Motor(Ports.PORT2, 18_1, False)
+leftBackMotor = Motor(Ports.PORT3, 18_1, False)
+rightBackMotor = Motor(Ports.PORT4, 18_1, False)
+frontSideMotor = Motor(Ports.PORT5, 18_1, False)
+backSideMotor = Motor(Ports.PORT6, 18_1, False)
 
-imu = Inertial(Ports.PORT6)
+imu = Inertial(Ports.PORT7)
 
-lineLeft = Line(brain.three_wire_port.b)
-lineRight = Line(brain.three_wire_port.a)
+lineLeft = Line(brain.three_wire_port.a)
+lineRight = Line(brain.three_wire_port.b)
 
 
 brain.screen.print("Calibrating")
