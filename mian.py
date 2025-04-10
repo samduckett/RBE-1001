@@ -1,17 +1,6 @@
 from vex import *
 
 
-def colorsFromStrategy(fruitPickingStrategy: list[str]):
-    colors = []
-    seen = set()
-    for col in fruitPickingStrategy:
-        color = col.split("_")[1]
-        if color not in seen:
-            colors.append(color)
-            seen.add(color)
-    return colors
-
-
 class Fruit:
     def __init__(self):
         self.originX = 0
@@ -23,6 +12,16 @@ class Fruit:
         self.score = 0
         self.fruitColor = ""
         self.widthHeightRatio = 0
+
+    def colorsFromStrategy(fruitPickingStrategy: list[str]):
+        colors = []
+        seen = set()
+        for col in fruitPickingStrategy:
+            color = col.split("_")[1]
+            if color not in seen:
+                colors.append(color)
+                seen.add(color)
+        return colors
 
     def g():
         pass
@@ -124,7 +123,7 @@ class Vision:
 
     def setStrategy(self, strategy: list[str]):
         self.strategy = strategy
-        self.strategyColors = colorsFromStrategy(self.strategy)
+        self.strategyColors = Fruit.colorsFromStrategy(self.strategy)
 
     def fruitDist(self, pixelWidth, ObjectWidthIn):
         angularWidth = self.degPerPixelWidth * pixelWidth
@@ -145,7 +144,7 @@ class Vision:
             match color.lower():
                 case "green":
                     for obj in self.aiVision.take_snapshot(self.greenFruit):
-                        tempFruit = self.makeFruit(obj, "green")
+                        tempFruit = self.makeFruitFromVisionObject(obj, "green")
                         if (
                             abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
                             < self.fruitSizeTolerance
@@ -162,7 +161,7 @@ class Vision:
                             self.objects["Small_Green"].append(tempFruit)
                 case "orange":
                     for obj in self.aiVision.take_snapshot(self.orangeFruit):
-                        tempFruit = self.makeFruit(obj, "orange")
+                        tempFruit = self.makeFruitFromVisionObject(obj, "orange")
                         if (
                             abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
                             < self.fruitSizeTolerance
@@ -179,7 +178,7 @@ class Vision:
                             self.objects["Small_Orange"].append(tempFruit)
                 case "yellow":
                     for obj in self.aiVision.take_snapshot(self.yellowFruit):
-                        tempFruit = self.makeFruit(obj, "yellow")
+                        tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
                         if (
                             abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
                             < self.fruitSizeTolerance
@@ -201,7 +200,7 @@ class Vision:
         # need the not not to return a boolean
         return not not self.objects
 
-    def makeFruit(self, obj: AiVisionObject, color: str) -> Fruit:
+    def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
         fruit.originX = obj.originX
         fruit.originY = obj.originY
