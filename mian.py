@@ -358,7 +358,7 @@ blocked: list[tuple[int]] = [
     (2, 8),
     (2, 5),
 ]
-treeLocations: dict[str, tuple[int]] = []
+treeBranchLocations: dict[str, tuple[int]] = []
 # grid on the inch
 grid = Grid(5, 10, blocked)
 
