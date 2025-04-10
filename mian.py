@@ -178,7 +178,6 @@ class Grid:
             if (dx1, dy1) == (dx2, dy2):
                 # Same direction, check how long it goes
                 direction = (dx1, dy1)
-                run_start = i - 1
                 run_end = i + 1
                 while run_end + 1 < len(path):
                     next_dir = (
