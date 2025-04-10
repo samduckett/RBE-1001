@@ -226,12 +226,15 @@ class HDrive:
     def __init__(
         self,
     ):
+        self.heading: float = 0
         pass
 
-    def turn():
-        pass
-
-    def drive():
+    def drive(self, velocityX: float, velocityY: float, heading: float = None):
+        """velocity in ft/s"""
+        if heading is not None:
+            self.heading = heading
+        # PID for velocity in x derection
+        # PID for velocity in y derection
         pass
 
 
