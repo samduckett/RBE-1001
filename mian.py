@@ -118,6 +118,10 @@ class Vision:
         self.strategy = []
         self.strategyColors = []
 
+        self.largeFruitRatio = 1.1  # guess
+        self.smallFruitRatio = 0.5  # guess
+        self.fruitSizeTolerance = 0.05  # guess
+
     def setStrategy(self, strategy: list[str]):
         self.strategy = strategy
         self.strategyColors = colorsFromStrategy(self.strategy)
@@ -141,29 +145,61 @@ class Vision:
             match color.lower():
                 case "green":
                     for obj in self.aiVision.take_snapshot(self.greenFruit):
-                        # Turn to fruit
-                        # if big append to big if small append to small
-                        self.objects.append(self.makeFruit(obj, "green"))
-                    self.objects["Small_Green"] = [1]
-                    print("green")
+                        tempFruit = self.makeFruit(obj, "green")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Green" not in self.objects:
+                                self.objects["Large_Green"] = []
+                            self.objects["Large_Green"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Green" not in self.objects:
+                                self.objects["Small_Green"] = []
+                            self.objects["Small_Green"].append(tempFruit)
                 case "orange":
-                    print("orange")
+                    for obj in self.aiVision.take_snapshot(self.orangeFruit):
+                        tempFruit = self.makeFruit(obj, "orange")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Orange" not in self.objects:
+                                self.objects["Large_Orange"] = []
+                            self.objects["Large_Orange"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Orange" not in self.objects:
+                                self.objects["Small_Orange"] = []
+                            self.objects["Small_Orange"].append(tempFruit)
                 case "yellow":
-                    self.objects["Large_Yellow"] = [1]
-                    print("yellow")
+                    for obj in self.aiVision.take_snapshot(self.yellowFruit):
+                        tempFruit = self.makeFruit(obj, "yellow")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Yellow" not in self.objects:
+                                self.objects["Large_Yellow"] = []
+                            self.objects["Large_Yellow"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Yellow" not in self.objects:
+                                self.objects["Small_Yellow"] = []
+                            self.objects["Small_Yellow"].append(tempFruit)
                 case _:
                     pass
             if self.strategy[index] in self.objects:
                 return True
         # need the not not to return a boolean
         return not not self.objects
-        print(self.objects)
-
-        # for obj in self.aiVision.take_snapshot(self.orangeFruit):
-        #     self.objects.append(self.makeFruit(obj, "orange"))
-
-        # for obj in self.aiVision.take_snapshot(self.yellowFruit):
-        #     self.objects.append(self.makeFruit(obj, "yellow"))
 
     def makeFruit(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
