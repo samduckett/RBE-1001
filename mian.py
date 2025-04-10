@@ -338,6 +338,7 @@ imu.set_heading(0, DEGREES)
 brain.screen.print("Finished Calibrating")
 
 # class definitions
+
 hDrive = HDrive()
 vision = Vision()
 
@@ -350,6 +351,28 @@ fruitPickingStrategy = [
     "Small_Orange",
 ]
 
+blocked: list[tuple[int]] = [
+    (4, 0),
+    (3, 3),
+    (2, 2),
+    (0, 3),
+    (4, 7),
+    (3, 9),
+    (2, 8),
+    (2, 5),
+]
+treeLocations: dict[str, tuple[int]] = []
+# grid on the inch
+grid = Grid(5, 10, blocked)
+
 vision.setStrategy(fruitPickingStrategy)
 
-vision.update()
+# vision.update()
+
+print("Planned Path", grid.compute_path((4, 9)))
+grid.print_grid()
+
+
+# drive up ramp till line cross then run code
+
+# navigate to wanted tree
