@@ -91,8 +91,18 @@ class Grid:
 
 # set desired stops and blocked nodes
 # row col
-stops = [(4, 3), (0, 2)]
-blocked = [(4, 0), (3, 3), (2, 2), (0, 3)]
+stops = [(19, 39)]
+
+blocked = set()
+import random
+
+# Keep generating until we have 20 unique tuples
+while len(blocked) < 60:
+    tup = (random.randint(0, 19), random.randint(0, 39))  # range can be adjusted
+    blocked.add(tup)
+
+# Convert to a list
+blocked = list(blocked)
 # call Dijkstra and set grid size
 grid = Grid(20, 40, blocked)
 # loop for all stops in list

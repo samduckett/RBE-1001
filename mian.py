@@ -23,9 +23,6 @@ class Fruit:
                 seen.add(color)
         return colors
 
-    def g():
-        pass
-
 
 class PID:
     def __init__(self, Kp, Ki, Kd, setpoint=0.0, tolerance=0.0):
