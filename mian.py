@@ -407,15 +407,14 @@ fruitPickingStrategy = [
     "Small_Orange",
 ]
 
-blocked: list[tuple[int]] = [
-    (4, 0),
+blocked: list[tuple[int, int]] = [
+    (3, 1),
     (3, 3),
     (2, 2),
-    (0, 3),
-    (4, 7),
-    (3, 9),
+    (3, 7),
     (2, 8),
     (2, 5),
+    (4, 6),
 ]
 treeBranchLocations: dict[str, tuple[int]] = []
 # grid on the inch
