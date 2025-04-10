@@ -1,59 +1,15 @@
 from vex import *
 
 
-class HDrive:
-    def __init__(
-        self,
-    ):
-        pass
-
-
-class Vision:
-    def __init__(
-        self,
-    ):
-        # fruit color configs
-        self.greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
-        self.orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
-        self.yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
-
-        # camera const
-        self.camWidth = 320
-        self.camHeight = 240
-        self.camVertFOV = 68
-        self.camHorizFOV = 74
-        self.degPerPixelWidth = self.camHorizFOV / self.camWidth
-        self.degPerPixelHeight = self.camVertFOV / self.camHeight
-
-        # vision config
-        self.aiVision = AiVision(
-            Ports.PORT14, self.greenFruit, self.orangeFruit, self.yellowFruit
-        )
-
-        # arrays of fruit
-        self.objects = []
-
-    def objectDist(self, pixelWidth, ObjectWidthIn):
-        angularWidth = self.degPerPixelWidth * pixelWidth
-        return (ObjectWidthIn * 0.5) / math.tan(math.radians(angularWidth * 0.5))
-
-    def update(self):
-        for obj in self.aiVision.take_snapshot(self.greenFruit):
-            self.objects.append(self.makeFruit(obj))
-
-    def makeFruit(self, obj):
-        fruit = Fruit()
-        fruit.originX = obj.originX
-        fruit.originY = obj.originY
-        fruit.centerX = obj.centerX
-        fruit.centerY = obj.centerY
-        fruit.width = obj.width
-        fruit.height = obj.height
-        fruit.score = obj.score
-        fruit.fruitColor = "green"
-        fruit.widthHeightRatio = fruit.width / fruit.height
-
-        return fruit
+def colorsFromStrategy(fruitPickingStrategy: list[str]):
+    colors = []
+    seen = set()
+    for col in fruitPickingStrategy:
+        color = col.split("_")[1]
+        if color not in seen:
+            colors.append(color)
+            seen.add(color)
+    return colors
 
 
 class Fruit:
@@ -67,6 +23,9 @@ class Fruit:
         self.score = 0
         self.fruitColor = ""
         self.widthHeightRatio = 0
+
+    def g():
+        pass
 
 
 class PID:
@@ -118,6 +77,109 @@ class PID:
         return abs(self.setpoint - measured_value) <= self.tolerance
 
 
+class HDrive:
+    def __init__(
+        self,
+    ):
+        pass
+
+    def turn():
+        pass
+
+    def drive():
+        pass
+
+
+class Vision:
+    def __init__(
+        self,
+    ):
+        # fruit color configs
+        self.greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
+        self.orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
+        self.yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
+
+        # camera const
+        self.camWidth = 320
+        self.camHeight = 240
+        self.camVertFOV = 68
+        self.camHorizFOV = 74
+        self.degPerPixelWidth = self.camHorizFOV / self.camWidth
+        self.degPerPixelHeight = self.camVertFOV / self.camHeight
+
+        # vision config
+        self.aiVision = AiVision(
+            Ports.PORT14, self.greenFruit, self.orangeFruit, self.yellowFruit
+        )
+
+        # arrays of fruit
+        self.objects = {}
+
+        self.strategy = []
+        self.strategyColors = []
+
+    def setStrategy(self, strategy: list[str]):
+        self.strategy = strategy
+        self.strategyColors = colorsFromStrategy(self.strategy)
+
+    def fruitDist(self, pixelWidth, ObjectWidthIn):
+        angularWidth = self.degPerPixelWidth * pixelWidth
+        return (ObjectWidthIn * 0.5) / math.tan(math.radians(angularWidth * 0.5))
+
+    def update(self) -> bool:
+        """
+        ### Parameters
+        none
+        ### What it does
+        updates the objects inside the vision class with what the camera seas
+        ### return
+        returns true if the camera detects and object"""
+        self.objects.clear()
+        print(self.strategyColors)
+
+        for index, color in enumerate(self.strategyColors):
+            match color.lower():
+                case "green":
+                    for obj in self.aiVision.take_snapshot(self.greenFruit):
+                        # Turn to fruit
+                        # if big append to big if small append to small
+                        self.objects.append(self.makeFruit(obj, "green"))
+                    self.objects["Small_Green"] = [1]
+                    print("green")
+                case "orange":
+                    print("orange")
+                case "yellow":
+                    self.objects["Large_Yellow"] = [1]
+                    print("yellow")
+                case _:
+                    pass
+            if self.strategy[index] in self.objects:
+                return True
+        # need the not not to return a boolean
+        return not not self.objects
+        print(self.objects)
+
+        # for obj in self.aiVision.take_snapshot(self.orangeFruit):
+        #     self.objects.append(self.makeFruit(obj, "orange"))
+
+        # for obj in self.aiVision.take_snapshot(self.yellowFruit):
+        #     self.objects.append(self.makeFruit(obj, "yellow"))
+
+    def makeFruit(self, obj: AiVisionObject, color: str) -> Fruit:
+        fruit = Fruit()
+        fruit.originX = obj.originX
+        fruit.originY = obj.originY
+        fruit.centerX = obj.centerX
+        fruit.centerY = obj.centerY
+        fruit.width = obj.width
+        fruit.height = obj.height
+        fruit.score = obj.score
+        fruit.fruitColor = color
+        fruit.widthHeightRatio = fruit.width / fruit.height
+
+        return fruit
+
+
 # Initial Robot
 brain = Brain()
 
@@ -137,7 +199,7 @@ lineRight = Line(brain.three_wire_port.b)
 brain.screen.print("Calibrating")
 
 # calibrate shit here
-Timer.clear()
+# Timer.clear() # UNCOMMENT
 imu.calibrate()
 
 
@@ -149,4 +211,19 @@ imu.set_heading(0, DEGREES)
 
 brain.screen.print("Finished Calibrating")
 
+# class definitions
 hDrive = HDrive()
+vision = Vision()
+
+fruitPickingStrategy = [
+    "Large_Green",
+    "Large_Yellow",
+    "Small_Green",
+    "Large_Orange",
+    "Small_Yellow",
+    "Small_Orange",
+]
+
+vision.setStrategy(fruitPickingStrategy)
+
+vision.update()
