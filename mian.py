@@ -146,7 +146,66 @@ class Grid:
         # flips and returns path
         path.reverse()
         self.current = final
+        path = self.optimizePath(path)
         return path
+
+    def optimizePath(self, path: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        if len(path) < 3:
+            return path
+
+        simplified = [path[0]]  # Start with the first point
+
+        i = 1
+        while i < len(path) - 1:
+            start = simplified[-1]
+            curr = path[i]
+            next = path[i + 1]
+
+            # Get direction vectors
+            dx1, dy1 = curr[0] - start[0], curr[1] - start[1]
+            dx2, dy2 = next[0] - curr[0], next[1] - curr[1]
+
+            # Normalize directions
+            if dx1 != 0:
+                dx1 //= abs(dx1)
+            if dy1 != 0:
+                dy1 //= abs(dy1)
+            if dx2 != 0:
+                dx2 //= abs(dx2)
+            if dy2 != 0:
+                dy2 //= abs(dy2)
+
+            if (dx1, dy1) == (dx2, dy2):
+                # Same direction, check how long it goes
+                direction = (dx1, dy1)
+                run_start = i - 1
+                run_end = i + 1
+                while run_end + 1 < len(path):
+                    next_dir = (
+                        path[run_end + 1][0] - path[run_end][0],
+                        path[run_end + 1][1] - path[run_end][1],
+                    )
+                    if next_dir[0] != 0:
+                        next_dir = (next_dir[0] // abs(next_dir[0]), next_dir[1])
+                    if next_dir[1] != 0:
+                        next_dir = (next_dir[0], next_dir[1] // abs(next_dir[1]))
+                    if next_dir == direction:
+                        run_end += 1
+                    else:
+                        break
+
+                # Add the endpoint of the run and skip the middle ones
+                simplified.append(path[run_end])
+                i = run_end + 1
+            else:
+                simplified.append(curr)
+                i += 1
+
+        # Add last point if it wasn't included
+        if simplified[-1] != path[-1]:
+            simplified.append(path[-1])
+
+        return simplified
 
     def print_grid(self):
         spacing = 1
