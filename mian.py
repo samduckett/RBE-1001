@@ -1,6 +1,17 @@
 from vex import *
 
 
+def colorsFromStrategy(fruitPickingStrategy: list[str]) -> list[str]:
+    colors = []
+    seen = set()
+    for col in fruitPickingStrategy:
+        color = col.split("_")[1]
+        if color not in seen:
+            colors.append(color)
+            seen.add(color)
+    return colors
+
+
 class Fruit:
     def __init__(self):
         self.originX = 0
@@ -27,6 +38,7 @@ class Fruit:
 class PID:
     def __init__(
         self,
+        brain: Brain,
         Kp: float,
         Ki: float,
         Kd: float,
@@ -36,6 +48,7 @@ class PID:
         minimumInput: float = 0.0,
         maximumInput: float = 360.0,
     ):
+        self.brain = brain
         # PID
         self.Kp: float = Kp
         self.Ki: float = Ki
@@ -68,9 +81,9 @@ class PID:
         return self.setpoint
 
     def update(self, measured: float, setpoint: float = None) -> float:
-        dt = timer.system() - self.lastTime
-        self.lastTime = timer.system()
-
+        dt = self.brain.timer.system() - self.lastTime
+        self.lastTime = self.brain.timer.system()
+        # brain.screen.print_at("dt" + str(dt), x=200, y=40)
         if setpoint is not None:
             self.setpoint = setpoint
 
@@ -134,10 +147,10 @@ class Grid:
             if node.col > 0:
                 node.neighbors.append(self.grid[(node.row, node.col - 1)])
 
-    def get_node(self, loc: tuple[int]):
+    def get_node(self, loc: tuple[int, int]):
         return self.grid[loc]
 
-    def computePath(self, final):
+    def computePath(self, final: tuple[int, int]) -> list[tuple[int, int]]:
         # creates a queue setting all distances to 100 and the current to previous using dictionary
         for node in self.grid:
             self.grid[node].dist = 100
@@ -231,31 +244,57 @@ class Grid:
 
         return simplified
 
-    # def print_grid(self):
-    #     spacing = 1
-    #     print("  " + " " * (spacing + 1), end="")
-    #     for col in range(self.cols):
-    #         print("\033[4m" + " " * spacing + f"{col}".zfill(2) + "\033[0m", end="")
-    #     for row in range(self.rows):
-    #         print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
-    #         for col in range(self.cols):
-    #             node = self.get_node((row, col))
-    #             print(
-    #                 " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
-    #                 end="",
-    #             )
-    #     print()
+    def print_grid(self):
+        spacing = 1
+        print("  " + " " * (spacing + 1), end="")
+        for col in range(self.cols):
+            print(" " * spacing + f"{col}".zfill(2), end="")
+        for row in range(self.rows):
+            print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
+            for col in range(self.cols):
+                node = self.get_node((row, col))
+                print(
+                    " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
+                    end="",
+                )
+        print()
+
+
+class Odometry:
+    def __init__(
+        self,
+        rangeFinderFront: Sonar,
+        rangeFinderRight: Sonar,
+    ):
+        self.rangeFinderFront = rangeFinderFront
+        self.rangeFinderRight = rangeFinderRight
+
+    def getPosition(self) -> tuple[int, int]:
+        return (0, 0)
 
 
 class HDrive:
-    def __init__(self, imu: Inertial):
-        self.heading: float = 0
+    def __init__(
+        self,
+        odometry: Odometry,
+        brain: Brain,
+        imu: Inertial,
+        lineLeft: Line,
+        lineRight: Line,
+    ):
+        self.odometry = odometry
+        # Robot Const
 
         self.wheelBase: float = 10
         self.wheelTrack: float = 10
 
-        self.maxWhealSpeed: float = 175
+        self.wheelDiameter: float = 4
+        self.wheelCircumstance: float = self.wheelDiameter * math.pi
 
+        self.brain = brain
+
+        self.maxWhealSpeed: float = 175
+        # Motors
         self.frontLeftMotor: Motor = Motor(Ports.PORT1, 18_1, False)
         self.frontRightMotor: Motor = Motor(Ports.PORT2, 18_1, True)
         self.backLeftMotor: Motor = Motor(Ports.PORT3, 18_1, False)
@@ -263,11 +302,17 @@ class HDrive:
         self.frontSideMotor: Motor = Motor(Ports.PORT5, 18_1, False)
         self.backSideMotor: Motor = Motor(Ports.PORT6, 18_1, True)
 
+        # Sensors
         self.imu: Inertial = imu
+
+        self.lineLeft: Line = lineLeft
+        self.lineRight: Line = lineRight
+
         # PID'S
         self.headingPID: PID = PID(  # TUNE!!!
-            Kp=30,
-            Ki=0.1,
+            self.brain,
+            Kp=5,
+            Ki=0,
             Kd=0,
             setpoint=0.0,
             tolerance=1.0,
@@ -276,8 +321,8 @@ class HDrive:
             maximumInput=360.0,
         )
 
-        self.positionPIDX = PID(Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
-        self.positionPIDY = PID(Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+        self.positionPIDX = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+        self.positionPIDY = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
 
     def configMotors(self):
         self.frontLeftMotor.reset_position()
@@ -287,13 +332,34 @@ class HDrive:
         self.frontSideMotor.reset_position()
         self.backSideMotor.reset_position()
 
-    def rotateVector(self, x, y, angle):
+    def rotateVector(self, x: float, y: float, angle: float):
         angleRad = math.radians(angle)
         cos = math.cos(angleRad)
         sin = math.sin(angleRad)
         return (x * cos - y * sin, x * sin + y * cos)
 
-    def dumbDrive(self, flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed):
+    def joystickToAngleDeg(self, x: float, y: float) -> float:
+        rad = math.atan2(y, x)
+        deg = math.degrees(rad)
+        return deg % 360
+
+    def stop(self):
+        self.frontLeftMotor.stop(HOLD)
+        self.frontRightMotor.stop(HOLD)
+        self.backLeftMotor.stop(HOLD)
+        self.backRightMotor.stop(HOLD)
+        self.frontSideMotor.stop(HOLD)
+        self.backSideMotor.stop(HOLD)
+
+    def dumbVelocityDrive(
+        self,
+        flSpeed: float,
+        frSpeed: float,
+        rlSpeed: float,
+        rrSpeed: float,
+        fsSpeed: float,
+        bsSpeed: float,
+    ):
         self.frontLeftMotor.spin(FORWARD, flSpeed, RPM)
         self.frontRightMotor.spin(FORWARD, frSpeed, RPM)
         self.backLeftMotor.spin(FORWARD, rlSpeed, RPM)
@@ -302,23 +368,27 @@ class HDrive:
         self.frontSideMotor.spin(FORWARD, fsSpeed, RPM)
         self.backSideMotor.spin(FORWARD, bsSpeed, RPM)
 
-    def fieldCentricDrive(self, forward: float, strafe: float, rotation: float):
-        # Boost strafe if needed
-        STRAFE_BOOST = 2.0
-        strafe *= STRAFE_BOOST
+        brain.screen.print_at(flSpeed, x=40, y=40)
+        brain.screen.print_at(frSpeed, x=40, y=60)
+        brain.screen.print_at(rlSpeed, x=40, y=80)
+        brain.screen.print_at(rrSpeed, x=40, y=100)
+        brain.screen.print_at(fsSpeed, x=40, y=120)
+        brain.screen.print_at(bsSpeed, x=40, y=140)
 
-        # Field-oriented translation
-        strafeFC, forwardFC = self.rotateVector(strafe, forward, imu.heading())
-
-        # 4 drive wheels: forward + rotation
-        flSpeed = forwardFC + rotation
-        frSpeed = forwardFC - rotation
-        rlSpeed = forwardFC + rotation
-        rrSpeed = forwardFC - rotation
+    def arcadeDrive(
+        self,
+        forward: float,
+        strafe: float,
+        rotation: float,
+    ):
+        flSpeed = forward + rotation
+        frSpeed = forward - rotation
+        rlSpeed = forward + rotation
+        rrSpeed = forward - rotation
 
         # 2 center wheels: strafe only
-        fsSpeed = strafeFC
-        bsSpeed = strafeFC
+        fsSpeed = strafe
+        bsSpeed = strafe
 
         # Normalize powers
         maxSpeed = max(
@@ -331,14 +401,40 @@ class HDrive:
             self.maxWhealSpeed,
         )
 
-        flSpeed /= maxSpeed
         frSpeed /= maxSpeed
+        flSpeed /= maxSpeed
         rlSpeed /= maxSpeed
         rrSpeed /= maxSpeed
         fsSpeed /= maxSpeed
         bsSpeed /= maxSpeed
 
-        self.dumbDrive(flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed)
+        frSpeed *= self.maxWhealSpeed
+        flSpeed *= self.maxWhealSpeed
+        rlSpeed *= self.maxWhealSpeed
+        rrSpeed *= self.maxWhealSpeed
+        fsSpeed *= self.maxWhealSpeed
+        bsSpeed *= self.maxWhealSpeed
+
+        self.dumbVelocityDrive(flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed)
+
+    def fieldCentricDrive(
+        self,
+        forward: float,
+        strafe: float,
+        rotation: float,
+    ):
+        # robot velicuty
+
+        # 36 in/second in the x derection
+
+        # Boost strafe if needed
+        strafeBoost = 2.0
+        strafe *= strafeBoost
+
+        # Field-oriented translation
+        strafeFC, forwardFC = self.rotateVector(strafe, forward, imu.heading())
+
+        self.arcadeDrive(forwardFC, strafeFC, rotation)
 
     def fieldCentricTargetAngleDrive(
         self,
@@ -348,25 +444,41 @@ class HDrive:
     ):
         # PID computes rotation power to reach target angle
         rotation = self.headingPID.update(measured=imu.heading(), setpoint=targetAngle)
-
+        brain.screen.print_at(targetAngle, x=40, y=160)
+        brain.screen.print_at(imu.heading(), x=40, y=180)
+        # brain.screen.print_at(imu.heading(), x=100, y=40)
         self.fieldCentricDrive(forward, strafe, rotation)
 
-    def driveController(self):
-        xSpeed = 75
-        ySpeed = 75
-        rotSpeed = 50
-
-        self.fieldCentricDrive(
-            controller.axis3.position() * ySpeed,
-            controller.axis2.position() * xSpeed,
-            controller.axis1.position() * rotSpeed,
+    def driveController(self, controller: Controller):
+        self.arcadeDrive(
+            controller.axis3.position(),
+            controller.axis1.position(),
+            controller.axis4.position(),
         )
 
-    def getPosition(self):
-        return (0, 0)
+        # self.fieldCentricDrive(
+        #     controller.axis3.position(),
+        #     controller.axis4.position(),
+        #     controller.axis1.position(),
+        # )
 
+        # self.fieldCentricTargetAngleDrive(
+        #     controller.axis3.position(),
+        #     controller.axis4.position(),
+        #     0,
+        # )
+
+        # self.fieldCentricTargetAngleDrive(
+        #     controller.axis3.position(),
+        #     controller.axis4.position(),
+        #     self.joystickToAngleDeg(
+        #         controller.axis1.position(), controller.axis1.position()
+        #     ),
+        # )
+
+    # center of robot
     def driveToPosition(self, posX: float, posY: float, targetAngle: float):
-        x, y = self.getPosition()
+        x, y = self.odometry.getPosition()
 
         forward = self.positionPIDY.update(measured=y, setpoint=posY)
         strafe = self.positionPIDX.update(measured=x, setpoint=posX)
@@ -410,7 +522,7 @@ class VisionFruit:
 
     def setStrategy(self, strategy: list[str]):
         self.strategy = strategy
-        self.strategyColors: list[str] = Fruit.colorsFromStrategy(self.strategy)
+        self.strategyColors: list[str] = colorsFromStrategy(self.strategy)
 
     def fruitDist(self, pixelWidth, ObjectWidthIn):
         angularWidth = self.degPerPixelWidth * pixelWidth
@@ -427,65 +539,65 @@ class VisionFruit:
         self.objects.clear()
         print(self.strategyColors)
 
-        for color in self.strategyColors:
-            match color.lower():
-                case "green":
-                    for obj in self.aiVision.take_snapshot(self.greenFruit):
-                        tempFruit = self.makeFruitFromVisionObject(obj, "green")
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Large_Green" not in self.objects:
-                                self.objects["Large_Green"] = []
-                            self.objects["Large_Green"].append(tempFruit)
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Small_Green" not in self.objects:
-                                self.objects["Small_Green"] = []
-                            self.objects["Small_Green"].append(tempFruit)
-                case "orange":
-                    for obj in self.aiVision.take_snapshot(self.orangeFruit):
-                        tempFruit = self.makeFruitFromVisionObject(obj, "orange")
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Large_Orange" not in self.objects:
-                                self.objects["Large_Orange"] = []
-                            self.objects["Large_Orange"].append(tempFruit)
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Small_Orange" not in self.objects:
-                                self.objects["Small_Orange"] = []
-                            self.objects["Small_Orange"].append(tempFruit)
-                case "yellow":
-                    for obj in self.aiVision.take_snapshot(self.yellowFruit):
-                        tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Large_Yellow" not in self.objects:
-                                self.objects["Large_Yellow"] = []
-                            self.objects["Large_Yellow"].append(tempFruit)
-                        if (
-                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                            < self.fruitSizeTolerance
-                        ):
-                            if "Small_Yellow" not in self.objects:
-                                self.objects["Small_Yellow"] = []
-                            self.objects["Small_Yellow"].append(tempFruit)
-                case _:
-                    pass
-            if self.strategy[self.strategyColors.index(color)] in self.objects:
-                return True
-        # need the not not to return a boolean
-        return not not self.objects
+        # for color in self.strategyColors:
+        #     match color.lower():
+        #         case "green":
+        #             for obj in self.aiVision.take_snapshot(self.greenFruit):
+        #                 tempFruit = self.makeFruitFromVisionObject(obj, "green")
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Large_Green" not in self.objects:
+        #                         self.objects["Large_Green"] = []
+        #                     self.objects["Large_Green"].append(tempFruit)
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Small_Green" not in self.objects:
+        #                         self.objects["Small_Green"] = []
+        #                     self.objects["Small_Green"].append(tempFruit)
+        #         case "orange":
+        #             for obj in self.aiVision.take_snapshot(self.orangeFruit):
+        #                 tempFruit = self.makeFruitFromVisionObject(obj, "orange")
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Large_Orange" not in self.objects:
+        #                         self.objects["Large_Orange"] = []
+        #                     self.objects["Large_Orange"].append(tempFruit)
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Small_Orange" not in self.objects:
+        #                         self.objects["Small_Orange"] = []
+        #                     self.objects["Small_Orange"].append(tempFruit)
+        #         case "yellow":
+        #             for obj in self.aiVision.take_snapshot(self.yellowFruit):
+        #                 tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Large_Yellow" not in self.objects:
+        #                         self.objects["Large_Yellow"] = []
+        #                     self.objects["Large_Yellow"].append(tempFruit)
+        #                 if (
+        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+        #                     < self.fruitSizeTolerance
+        #                 ):
+        #                     if "Small_Yellow" not in self.objects:
+        #                         self.objects["Small_Yellow"] = []
+        #                     self.objects["Small_Yellow"].append(tempFruit)
+        #         case _:
+        #             pass
+        #     if self.strategy[self.strategyColors.index(color)] in self.objects:
+        #         return True
+        # # need the not not to return a boolean
+        # return not not self.objects
 
     def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
@@ -502,41 +614,7 @@ class VisionFruit:
         return fruit
 
 
-# Initial Robot
-brain = Brain()
-
-# sensors
-imu = Inertial(Ports.PORT7)
-
-lineLeft = Line(brain.three_wire_port.a)
-lineRight = Line(brain.three_wire_port.b)
-
-controller = Controller(PRIMARY)
-
-# classes
-hDrive = HDrive()
-vision = VisionFruit()
-
-
-brain.screen.print("Calibrating")
-
-# calibrate shit here and zero
-
-hDrive.configMotors()
-
-imu.calibrate()
-
-while imu.is_calibrating():
-    wait(5)
-
-timer.clear()
-imu.set_heading(0, DEGREES)
-imu.set_rotation(0, DEGREES)
-
-
-brain.screen.print("Finished Calibrating")
-
-# Field Const
+# const
 fruitPickingStrategy = [
     "Large_Green",
     "Large_Yellow",
@@ -545,8 +623,6 @@ fruitPickingStrategy = [
     "Small_Yellow",
     "Small_Orange",
 ]
-
-vision.setStrategy(fruitPickingStrategy)
 
 blocked: list[tuple[int, int]] = [
     (3, 1),
@@ -557,21 +633,56 @@ blocked: list[tuple[int, int]] = [
     (2, 5),
     (4, 6),
 ]
-treeBranchLocations: dict[str, list[tuple[int]]] = {"Green": [(4, 9)]}
 
-# grid on the inch
-field = Grid(5, 10, blocked)
+treeBranchLocations: dict[str, list[tuple[int]]] = {
+    "Green": [(4, 9), (3, 9), (2, 9)],
+    "Yellow": [(4, 8), (3, 8), (2, 8)],
+}
 
-print(
-    "Planned Path to first branch in strategy",
-    field.computePath(
-        treeBranchLocations.get(Fruit.colorsFromStrategy(fruitPickingStrategy)[0])[0]
-    ),
-)
+# Initial Robot and stuff
+brain = Brain()
 
+imu = Inertial(Ports.PORT7)
+
+lineLeft = Line(brain.three_wire_port.a)
+lineRight = Line(brain.three_wire_port.b)
+
+rangeFinderFront = None  # Sonar(brain.three_wire_port.e)
+rangeFinderRight = None  # Sonar(brain.three_wire_port.c)
+
+controller = Controller(PRIMARY)
+
+# 5ft x 10ft guess
+
+# field = Grid(60, 120, blocked)
+
+# classes
+odometry = Odometry(rangeFinderFront, rangeFinderRight)
+
+hDrive = HDrive(odometry, brain, imu, lineLeft, lineRight)
+
+# vision = VisionFruit()
+
+
+# calibrate shit here and zero
+
+brain.screen.print("Calibrating")
+
+# vision.setStrategy(fruitPickingStrategy)
+
+hDrive.configMotors()
+
+imu.calibrate()
+
+while imu.is_calibrating():
+    wait(5)
+
+brain.timer.clear()
+imu.set_heading(0, DEGREES)
+imu.set_rotation(0, DEGREES)
+
+brain.screen.print("Finished Calibrating")
+
+# RUN CODE HERE
 while True:
-    hDrive.driveController()
-
-# drive up ramp till line cross then run code
-
-# navigate to wanted tree
+    hDrive.driveController(controller)
