@@ -94,7 +94,7 @@ class PID:
 
         return P + I + D
 
-    def at_goal(self, measured_value) -> bool:
+    def atGoal(self, measured_value) -> bool:
         return abs(self.setpoint - measured_value) <= self.tolerance
 
 
@@ -137,7 +137,7 @@ class Grid:
     def get_node(self, loc: tuple[int]):
         return self.grid[loc]
 
-    def compute_path(self, final):
+    def computePath(self, final):
         # creates a queue setting all distances to 100 and the current to previous using dictionary
         for node in self.grid:
             self.grid[node].dist = 100
@@ -203,24 +203,24 @@ class Grid:
             if (dx1, dy1) == (dx2, dy2):
                 # Same direction, check how long it goes
                 direction = (dx1, dy1)
-                run_end = i + 1
-                while run_end + 1 < len(path):
-                    next_dir = (
-                        path[run_end + 1][0] - path[run_end][0],
-                        path[run_end + 1][1] - path[run_end][1],
+                runEnd = i + 1
+                while runEnd + 1 < len(path):
+                    nextDir = (
+                        path[runEnd + 1][0] - path[runEnd][0],
+                        path[runEnd + 1][1] - path[runEnd][1],
                     )
-                    if next_dir[0] != 0:
-                        next_dir = (next_dir[0] // abs(next_dir[0]), next_dir[1])
-                    if next_dir[1] != 0:
-                        next_dir = (next_dir[0], next_dir[1] // abs(next_dir[1]))
-                    if next_dir == direction:
-                        run_end += 1
+                    if nextDir[0] != 0:
+                        nextDir = (nextDir[0] // abs(nextDir[0]), nextDir[1])
+                    if nextDir[1] != 0:
+                        nextDir = (nextDir[0], nextDir[1] // abs(nextDir[1]))
+                    if nextDir == direction:
+                        runEnd += 1
                     else:
                         break
 
                 # Add the endpoint of the run and skip the middle ones
-                simplified.append(path[run_end])
-                i = run_end + 1
+                simplified.append(path[runEnd])
+                i = runEnd + 1
             else:
                 simplified.append(curr)
                 i += 1
@@ -264,17 +264,20 @@ class HDrive:
         self.backSideMotor: Motor = Motor(Ports.PORT6, 18_1, True)
 
         self.imu: Inertial = imu
-        # PIDS
+        # PID'S
         self.headingPID: PID = PID(  # TUNE!!!
-            Kp=0.2,
-            Ki=0.01,
+            Kp=30,
+            Ki=0.1,
             Kd=0,
             setpoint=0.0,
             tolerance=1.0,
             continuous=True,
-            minimum_input=0.0,
-            maximum_input=360.0,
+            minimumInput=0.0,
+            maximumInput=360.0,
         )
+
+        self.positionPIDX = PID(Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+        self.positionPIDY = PID(Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
 
     def configMotors(self):
         self.frontLeftMotor.reset_position()
@@ -359,8 +362,18 @@ class HDrive:
             controller.axis1.position() * rotSpeed,
         )
 
-    def drivePosition(self, posX: float, posY: float):
-        pass
+    def getPosition(self):
+        return (0, 0)
+
+    def driveToPosition(self, posX: float, posY: float, targetAngle: float):
+        x, y = self.getPosition()
+
+        forward = self.positionPIDY.update(measured=y, setpoint=posY)
+        strafe = self.positionPIDX.update(measured=x, setpoint=posX)
+
+        self.fieldCentricTargetAngleDrive(forward, strafe, targetAngle)
+
+        return self.positionPIDY.atGoal(y) and self.positionPIDY.atGoal(x)
 
 
 class VisionFruit:
@@ -492,7 +505,7 @@ class VisionFruit:
 # Initial Robot
 brain = Brain()
 
-# seonsors
+# sensors
 imu = Inertial(Ports.PORT7)
 
 lineLeft = Line(brain.three_wire_port.a)
@@ -551,7 +564,7 @@ field = Grid(5, 10, blocked)
 
 print(
     "Planned Path to first branch in strategy",
-    field.compute_path(
+    field.computePath(
         treeBranchLocations.get(Fruit.colorsFromStrategy(fruitPickingStrategy)[0])[0]
     ),
 )

@@ -3,6 +3,7 @@
         "Colordesc",
         "Holonomic",
         "Horiz",
+        "PIDX",
         "setpoint"
     ]
 }
