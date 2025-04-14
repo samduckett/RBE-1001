@@ -3266,7 +3266,7 @@ class Thread:
 # ----------------------------------------------------------
 
 
-class Timer:
+class timer:
     """### Timer class - create a new timer
 
     This class is used to create a new timer\\

@@ -13,7 +13,7 @@ class Fruit:
         self.fruitColor = ""
         self.widthHeightRatio = 0
 
-    def colorsFromStrategy(fruitPickingStrategy: list[str]):
+    def colorsFromStrategy(self, fruitPickingStrategy: list[str]) -> list[str]:
         colors = []
         seen = set()
         for col in fruitPickingStrategy:
@@ -25,33 +25,58 @@ class Fruit:
 
 
 class PID:
-    def __init__(self, Kp, Ki, Kd, setpoint=0.0, tolerance=0.0):
-        self.Kp = Kp
-        self.Ki = Ki
-        self.Kd = Kd
+    def __init__(
+        self,
+        Kp: float,
+        Ki: float,
+        Kd: float,
+        setpoint: float = 0.0,
+        tolerance: float = 0.0,
+        continuous: bool = False,
+        minimumInput: float = 0.0,
+        maximumInput: float = 360.0,
+    ):
+        # PID
+        self.Kp: float = Kp
+        self.Ki: float = Ki
+        self.Kd: float = Kd
 
         # setpoint and tolerance
-        self.setpoint = setpoint
-        self.tolerance = tolerance
+        self.setpoint: float = setpoint
+        self.tolerance: float = tolerance
+
+        # Continuous
+        self.continuous = continuous
+        self.minimumInput = minimumInput
+        self.maximumInput = maximumInput
 
         # internal state
-        self.lastError = 0.0
-        self.integral = 0.0
-        self.lastTime = 0
+        self.lastError: float = 0.0
+        self.integral: float = 0.0
+        self.lastTime: float = 0
 
-    def setSetpoint(self, newSetpoint):
-        self.setpoint = newSetpoint
+    def warpError(self, error: float) -> float:
+        range = self.maximumInput - self.minimumInput
+        return (error + range / 2) % range - range / 2
+
+    def setSetpoint(self, newSetpoint: float):
+        self.setpoint: float = newSetpoint
         self.integral = 0.0
         self.lastError = 0.0
 
-    def update(self, measured, setpoint=None):
-        dt = Timer.system() - self.lastTime
-        self.lastTime = Timer.system()
+    def getSetpoint(self) -> float:
+        return self.setpoint
+
+    def update(self, measured: float, setpoint: float = None) -> float:
+        dt = timer.system() - self.lastTime
+        self.lastTime = timer.system()
 
         if setpoint is not None:
             self.setpoint = setpoint
 
         error = self.setpoint - measured
+        if self.continuous:
+            error = self.warpError(error)
 
         # P term
         P = self.Kp * error
@@ -69,7 +94,7 @@ class PID:
 
         return P + I + D
 
-    def at_goal(self, measured_value):
+    def at_goal(self, measured_value) -> bool:
         return abs(self.setpoint - measured_value) <= self.tolerance
 
 
@@ -206,20 +231,20 @@ class Grid:
 
         return simplified
 
-    def print_grid(self):
-        spacing = 1
-        print("  " + " " * (spacing + 1), end="")
-        for col in range(self.cols):
-            print("\033[4m" + " " * spacing + f"{col}".zfill(2) + "\033[0m", end="")
-        for row in range(self.rows):
-            print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
-            for col in range(self.cols):
-                node = self.get_node((row, col))
-                print(
-                    " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
-                    end="",
-                )
-        print()
+    # def print_grid(self):
+    #     spacing = 1
+    #     print("  " + " " * (spacing + 1), end="")
+    #     for col in range(self.cols):
+    #         print("\033[4m" + " " * spacing + f"{col}".zfill(2) + "\033[0m", end="")
+    #     for row in range(self.rows):
+    #         print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
+    #         for col in range(self.cols):
+    #             node = self.get_node((row, col))
+    #             print(
+    #                 " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
+    #                 end="",
+    #             )
+    #     print()
 
 
 class HDrive:
@@ -227,18 +252,51 @@ class HDrive:
         self,
     ):
         self.heading: float = 0
-        pass
+
+        self.wheelBase = 10
+        self.wheelTrack = 10
+
+        self.frontLeftMotor = Motor(Ports.PORT1, 18_1, False)
+        self.frontRightMotor = Motor(Ports.PORT2, 18_1, True)
+        self.backLeftMotor = Motor(Ports.PORT3, 18_1, False)
+        self.backRightMotor = Motor(Ports.PORT4, 18_1, True)
+        self.frontSideMotor = Motor(Ports.PORT5, 18_1, False)
+        self.backSideMotor = Motor(Ports.PORT6, 18_1, True)
+
+    def configMotors(self):
+        self.frontLeftMotor.reset_position()
+        self.frontRightMotor.reset_position()
+        self.backLeftMotor.reset_position()
+        self.backRightMotor.reset_position()
+        self.frontSideMotor.reset_position()
+        self.backSideMotor.reset_position()
 
     def drive(self, velocityX: float, velocityY: float, heading: float = None):
         """velocity in ft/s"""
         if heading is not None:
             self.heading = heading
-        # PID for velocity in x derection
-        # PID for velocity in y derection
+
+        self.frontLeftMotor.spin(FORWARD, velocityY, RPM)
+        self.frontRightMotor.spin(FORWARD, velocityY, RPM)
+        self.backLeftMotor.spin(FORWARD, velocityY, RPM)
+        self.backRightMotor.spin(FORWARD, velocityY, RPM)
+
+        self.frontSideMotor.spin(FORWARD, velocityX, RPM)
+        self.backSideMotor.spin(FORWARD, velocityX, RPM)
+
+    def driveController(self):
+        xSpeed = 100
+        ySpeed = 100
+
+        self.drive(
+            controller.axis3.position() * ySpeed, controller.axis1.position() * xSpeed
+        )
+
+    def drivePosition(self, posX: float, posY: float):
         pass
 
 
-class Vision:
+class VisionFruit:
     def __init__(
         self,
     ):
@@ -264,7 +322,7 @@ class Vision:
         self.objects = {}
 
         self.strategy = []
-        self.strategyColors = []
+        self.strategyColors: list[str] = []
 
         self.largeFruitRatio = 1.1  # guess
         self.smallFruitRatio = 0.5  # guess
@@ -272,7 +330,7 @@ class Vision:
 
     def setStrategy(self, strategy: list[str]):
         self.strategy = strategy
-        self.strategyColors = Fruit.colorsFromStrategy(self.strategy)
+        self.strategyColors: list[str] = Fruit.colorsFromStrategy(self.strategy)
 
     def fruitDist(self, pixelWidth, ObjectWidthIn):
         angularWidth = self.degPerPixelWidth * pixelWidth
@@ -289,7 +347,7 @@ class Vision:
         self.objects.clear()
         print(self.strategyColors)
 
-        for index, color in enumerate(self.strategyColors):
+        for color in self.strategyColors:
             match color.lower():
                 case "green":
                     for obj in self.aiVision.take_snapshot(self.greenFruit):
@@ -344,7 +402,7 @@ class Vision:
                             self.objects["Small_Yellow"].append(tempFruit)
                 case _:
                     pass
-            if self.strategy[index] in self.objects:
+            if self.strategy[self.strategyColors.index(color)] in self.objects:
                 return True
         # need the not not to return a boolean
         return not not self.objects
@@ -367,39 +425,38 @@ class Vision:
 # Initial Robot
 brain = Brain()
 
-leftFrontMotor = Motor(Ports.PORT1, 18_1, False)
-rightFrontMotor = Motor(Ports.PORT2, 18_1, False)
-leftBackMotor = Motor(Ports.PORT3, 18_1, False)
-rightBackMotor = Motor(Ports.PORT4, 18_1, False)
-frontSideMotor = Motor(Ports.PORT5, 18_1, False)
-backSideMotor = Motor(Ports.PORT6, 18_1, False)
-
+# seonsors
 imu = Inertial(Ports.PORT7)
 
 lineLeft = Line(brain.three_wire_port.a)
 lineRight = Line(brain.three_wire_port.b)
 
+controller = Controller(PRIMARY)
+
+# classes
+hDrive = HDrive()
+vision = VisionFruit()
+
 
 brain.screen.print("Calibrating")
 
-# calibrate shit here
-# Timer.clear() # UNCOMMENT
-imu.calibrate()
+# calibrate shit here and zero
 
+hDrive.configMotors()
+
+imu.calibrate()
 
 while imu.is_calibrating():
     wait(5)
 
+timer.clear()
 imu.set_heading(0, DEGREES)
+imu.set_rotation(0, DEGREES)
 
 
 brain.screen.print("Finished Calibrating")
 
-# class definitions
-
-hDrive = HDrive()
-vision = Vision()
-
+# Field Const
 fruitPickingStrategy = [
     "Large_Green",
     "Large_Yellow",
@@ -408,6 +465,8 @@ fruitPickingStrategy = [
     "Small_Yellow",
     "Small_Orange",
 ]
+
+vision.setStrategy(fruitPickingStrategy)
 
 blocked: list[tuple[int, int]] = [
     (3, 1),
@@ -418,17 +477,20 @@ blocked: list[tuple[int, int]] = [
     (2, 5),
     (4, 6),
 ]
-treeBranchLocations: dict[str, tuple[int]] = []
+treeBranchLocations: dict[str, list[tuple[int]]] = {"Green": [(4, 9)]}
+
 # grid on the inch
-grid = Grid(5, 10, blocked)
+field = Grid(5, 10, blocked)
 
-vision.setStrategy(fruitPickingStrategy)
+print(
+    "Planned Path to first branch in strategy",
+    field.compute_path(
+        treeBranchLocations.get(Fruit.colorsFromStrategy(fruitPickingStrategy)[0])[0]
+    ),
+)
 
-# vision.update()
-
-print("Planned Path", grid.compute_path((4, 9)))
-grid.print_grid()
-
+while True:
+    hDrive.driveController()
 
 # drive up ramp till line cross then run code
 
