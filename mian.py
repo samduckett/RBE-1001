@@ -248,20 +248,33 @@ class Grid:
 
 
 class HDrive:
-    def __init__(
-        self,
-    ):
+    def __init__(self, imu: Inertial):
         self.heading: float = 0
 
-        self.wheelBase = 10
-        self.wheelTrack = 10
+        self.wheelBase: float = 10
+        self.wheelTrack: float = 10
 
-        self.frontLeftMotor = Motor(Ports.PORT1, 18_1, False)
-        self.frontRightMotor = Motor(Ports.PORT2, 18_1, True)
-        self.backLeftMotor = Motor(Ports.PORT3, 18_1, False)
-        self.backRightMotor = Motor(Ports.PORT4, 18_1, True)
-        self.frontSideMotor = Motor(Ports.PORT5, 18_1, False)
-        self.backSideMotor = Motor(Ports.PORT6, 18_1, True)
+        self.maxWhealSpeed: float = 175
+
+        self.frontLeftMotor: Motor = Motor(Ports.PORT1, 18_1, False)
+        self.frontRightMotor: Motor = Motor(Ports.PORT2, 18_1, True)
+        self.backLeftMotor: Motor = Motor(Ports.PORT3, 18_1, False)
+        self.backRightMotor: Motor = Motor(Ports.PORT4, 18_1, True)
+        self.frontSideMotor: Motor = Motor(Ports.PORT5, 18_1, False)
+        self.backSideMotor: Motor = Motor(Ports.PORT6, 18_1, True)
+
+        self.imu: Inertial = imu
+        # PIDS
+        self.headingPID: PID = PID(  # TUNE!!!
+            Kp=0.2,
+            Ki=0.01,
+            Kd=0,
+            setpoint=0.0,
+            tolerance=1.0,
+            continuous=True,
+            minimum_input=0.0,
+            maximum_input=360.0,
+        )
 
     def configMotors(self):
         self.frontLeftMotor.reset_position()
@@ -271,25 +284,79 @@ class HDrive:
         self.frontSideMotor.reset_position()
         self.backSideMotor.reset_position()
 
-    def drive(self, velocityX: float, velocityY: float, heading: float = None):
-        """velocity in ft/s"""
-        if heading is not None:
-            self.heading = heading
+    def rotateVector(self, x, y, angle):
+        angleRad = math.radians(angle)
+        cos = math.cos(angleRad)
+        sin = math.sin(angleRad)
+        return (x * cos - y * sin, x * sin + y * cos)
 
-        self.frontLeftMotor.spin(FORWARD, velocityY, RPM)
-        self.frontRightMotor.spin(FORWARD, velocityY, RPM)
-        self.backLeftMotor.spin(FORWARD, velocityY, RPM)
-        self.backRightMotor.spin(FORWARD, velocityY, RPM)
+    def dumbDrive(self, flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed):
+        self.frontLeftMotor.spin(FORWARD, flSpeed, RPM)
+        self.frontRightMotor.spin(FORWARD, frSpeed, RPM)
+        self.backLeftMotor.spin(FORWARD, rlSpeed, RPM)
+        self.backRightMotor.spin(FORWARD, rrSpeed, RPM)
 
-        self.frontSideMotor.spin(FORWARD, velocityX, RPM)
-        self.backSideMotor.spin(FORWARD, velocityX, RPM)
+        self.frontSideMotor.spin(FORWARD, fsSpeed, RPM)
+        self.backSideMotor.spin(FORWARD, bsSpeed, RPM)
+
+    def fieldCentricDrive(self, forward: float, strafe: float, rotation: float):
+        # Boost strafe if needed
+        STRAFE_BOOST = 2.0
+        strafe *= STRAFE_BOOST
+
+        # Field-oriented translation
+        strafeFC, forwardFC = self.rotateVector(strafe, forward, imu.heading())
+
+        # 4 drive wheels: forward + rotation
+        flSpeed = forwardFC + rotation
+        frSpeed = forwardFC - rotation
+        rlSpeed = forwardFC + rotation
+        rrSpeed = forwardFC - rotation
+
+        # 2 center wheels: strafe only
+        fsSpeed = strafeFC
+        bsSpeed = strafeFC
+
+        # Normalize powers
+        maxSpeed = max(
+            abs(flSpeed),
+            abs(frSpeed),
+            abs(rlSpeed),
+            abs(rrSpeed),
+            abs(fsSpeed),
+            abs(bsSpeed),
+            self.maxWhealSpeed,
+        )
+
+        flSpeed /= maxSpeed
+        frSpeed /= maxSpeed
+        rlSpeed /= maxSpeed
+        rrSpeed /= maxSpeed
+        fsSpeed /= maxSpeed
+        bsSpeed /= maxSpeed
+
+        self.dumbDrive(flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed)
+
+    def fieldCentricTargetAngleDrive(
+        self,
+        forward: float,
+        strafe: float,
+        targetAngle: float,
+    ):
+        # PID computes rotation power to reach target angle
+        rotation = self.headingPID.update(measured=imu.heading(), setpoint=targetAngle)
+
+        self.fieldCentricDrive(forward, strafe, rotation)
 
     def driveController(self):
-        xSpeed = 100
-        ySpeed = 100
+        xSpeed = 75
+        ySpeed = 75
+        rotSpeed = 50
 
-        self.drive(
-            controller.axis3.position() * ySpeed, controller.axis1.position() * xSpeed
+        self.fieldCentricDrive(
+            controller.axis3.position() * ySpeed,
+            controller.axis2.position() * xSpeed,
+            controller.axis1.position() * rotSpeed,
         )
 
     def drivePosition(self, posX: float, posY: float):
