@@ -1,28 +1,16 @@
 from vex import *
 
 
-def colorsFromStrategy(fruitPickingStrategy: list[str]) -> list[str]:
-    colors = []
-    seen = set()
-    for col in fruitPickingStrategy:
-        color = col.split("_")[1]
-        if color not in seen:
-            colors.append(color)
-            seen.add(color)
-    return colors
-
-
 class Fruit:
-    def __init__(self):
-        self.originX = 0
-        self.originY = 0
-        self.centerX = 0
-        self.centerY = 0
-        self.width = 0
-        self.height = 0
-        self.score = 0
-        self.fruitColor = ""
-        self.widthHeightRatio = 0
+    originX = 0
+    originY = 0
+    centerX = 0
+    centerY = 0
+    width = 0
+    height = 0
+    score = 0
+    fruitColor = ""
+    widthHeightRatio = 0
 
     def colorsFromStrategy(self, fruitPickingStrategy: list[str]) -> list[str]:
         colors = []
@@ -244,20 +232,20 @@ class Grid:
 
         return simplified
 
-    def print_grid(self):
-        spacing = 1
-        print("  " + " " * (spacing + 1), end="")
-        for col in range(self.cols):
-            print(" " * spacing + f"{col}".zfill(2), end="")
-        for row in range(self.rows):
-            print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
-            for col in range(self.cols):
-                node = self.get_node((row, col))
-                print(
-                    " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
-                    end="",
-                )
-        print()
+    # def print_grid(self):
+    #     spacing = 1
+    #     print("  " + " " * (spacing + 1), end="")
+    #     for col in range(self.cols):
+    #         print(" " * spacing + f"{col}".zfill(2), end="")
+    #     for row in range(self.rows):
+    #         print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
+    #         for col in range(self.cols):
+    #             node = self.get_node((row, col))
+    #             print(
+    #                 " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
+    #                 end="",
+    #             )
+    #     print()
 
 
 class Odometry:
@@ -423,10 +411,6 @@ class HDrive:
         strafe: float,
         rotation: float,
     ):
-        # robot velicuty
-
-        # 36 in/second in the x derection
-
         # Boost strafe if needed
         strafeBoost = 2.0
         strafe *= strafeBoost
@@ -522,7 +506,7 @@ class VisionFruit:
 
     def setStrategy(self, strategy: list[str]):
         self.strategy = strategy
-        self.strategyColors: list[str] = colorsFromStrategy(self.strategy)
+        self.strategyColors: list[str] = Fruit.colorsFromStrategy(self.strategy)
 
     def fruitDist(self, pixelWidth, ObjectWidthIn):
         angularWidth = self.degPerPixelWidth * pixelWidth
@@ -539,65 +523,65 @@ class VisionFruit:
         self.objects.clear()
         print(self.strategyColors)
 
-        # for color in self.strategyColors:
-        #     match color.lower():
-        #         case "green":
-        #             for obj in self.aiVision.take_snapshot(self.greenFruit):
-        #                 tempFruit = self.makeFruitFromVisionObject(obj, "green")
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Large_Green" not in self.objects:
-        #                         self.objects["Large_Green"] = []
-        #                     self.objects["Large_Green"].append(tempFruit)
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Small_Green" not in self.objects:
-        #                         self.objects["Small_Green"] = []
-        #                     self.objects["Small_Green"].append(tempFruit)
-        #         case "orange":
-        #             for obj in self.aiVision.take_snapshot(self.orangeFruit):
-        #                 tempFruit = self.makeFruitFromVisionObject(obj, "orange")
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Large_Orange" not in self.objects:
-        #                         self.objects["Large_Orange"] = []
-        #                     self.objects["Large_Orange"].append(tempFruit)
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Small_Orange" not in self.objects:
-        #                         self.objects["Small_Orange"] = []
-        #                     self.objects["Small_Orange"].append(tempFruit)
-        #         case "yellow":
-        #             for obj in self.aiVision.take_snapshot(self.yellowFruit):
-        #                 tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Large_Yellow" not in self.objects:
-        #                         self.objects["Large_Yellow"] = []
-        #                     self.objects["Large_Yellow"].append(tempFruit)
-        #                 if (
-        #                     abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-        #                     < self.fruitSizeTolerance
-        #                 ):
-        #                     if "Small_Yellow" not in self.objects:
-        #                         self.objects["Small_Yellow"] = []
-        #                     self.objects["Small_Yellow"].append(tempFruit)
-        #         case _:
-        #             pass
-        #     if self.strategy[self.strategyColors.index(color)] in self.objects:
-        #         return True
-        # # need the not not to return a boolean
-        # return not not self.objects
+        for color in self.strategyColors:
+            match color.lower():
+                case "green":
+                    for obj in self.aiVision.take_snapshot(self.greenFruit):
+                        tempFruit = self.makeFruitFromVisionObject(obj, "green")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Green" not in self.objects:
+                                self.objects["Large_Green"] = []
+                            self.objects["Large_Green"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Green" not in self.objects:
+                                self.objects["Small_Green"] = []
+                            self.objects["Small_Green"].append(tempFruit)
+                case "orange":
+                    for obj in self.aiVision.take_snapshot(self.orangeFruit):
+                        tempFruit = self.makeFruitFromVisionObject(obj, "orange")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Orange" not in self.objects:
+                                self.objects["Large_Orange"] = []
+                            self.objects["Large_Orange"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Orange" not in self.objects:
+                                self.objects["Small_Orange"] = []
+                            self.objects["Small_Orange"].append(tempFruit)
+                case "yellow":
+                    for obj in self.aiVision.take_snapshot(self.yellowFruit):
+                        tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Large_Yellow" not in self.objects:
+                                self.objects["Large_Yellow"] = []
+                            self.objects["Large_Yellow"].append(tempFruit)
+                        if (
+                            abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                            < self.fruitSizeTolerance
+                        ):
+                            if "Small_Yellow" not in self.objects:
+                                self.objects["Small_Yellow"] = []
+                            self.objects["Small_Yellow"].append(tempFruit)
+                case _:
+                    pass
+            if self.strategy[self.strategyColors.index(color)] in self.objects:
+                return True
+        # need the not not to return a boolean
+        return not not self.objects
 
     def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
@@ -612,6 +596,25 @@ class VisionFruit:
         fruit.widthHeightRatio = fruit.width / fruit.height
 
         return fruit
+
+
+class Arm:
+    def __init__(self):
+
+        self.driveRatio = 4
+        armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
+        # self.positionPIDX = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+
+    def controlController(self, controller: Controller):
+        # horizontal 0
+        # vertical -680
+        # other horizontal -1250
+
+        brain.screen.print_at(armMotor.position(DEGREES), x=40, y=40)
+        if not abs(controller.axis2.position()) < 0.05:
+            armMotor.spin(FORWARD, controller.axis2.position() * 50, RPM)
+        else:
+            armMotor.stop(HOLD)
 
 
 # const
@@ -653,22 +656,20 @@ rangeFinderRight = None  # Sonar(brain.three_wire_port.c)
 controller = Controller(PRIMARY)
 
 # 5ft x 10ft guess
-
-# field = Grid(60, 120, blocked)
+field = Grid(20, 50, blocked)
 
 # classes
 odometry = Odometry(rangeFinderFront, rangeFinderRight)
-
 hDrive = HDrive(odometry, brain, imu, lineLeft, lineRight)
-
-# vision = VisionFruit()
+arm = Arm()
+vision = VisionFruit()
 
 
 # calibrate shit here and zero
 
 brain.screen.print("Calibrating")
 
-# vision.setStrategy(fruitPickingStrategy)
+vision.setStrategy(fruitPickingStrategy)
 
 hDrive.configMotors()
 
