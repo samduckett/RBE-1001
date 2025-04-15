@@ -33,10 +33,10 @@ class GridNode:
 
 
 class Transform2D:
-    def __init__(self):
-        self.dX: float
-        self.dY: float
-        self.dTheta: float
+    def __init__(self, dX, dY, dTheta):
+        self.dX: float = dX
+        self.dY: float = dY
+        self.dTheta: float = dTheta
 
     def inverse(self):
         angle_rad = radians(-self.dTheta)
@@ -46,10 +46,10 @@ class Transform2D:
 
 
 class Pose2D:
-    def __init__(self):
-        self.x: float
-        self.y: float
-        self.heading: float
+    def __init__(self, x, y, heading):
+        self.x: float = x
+        self.y: float = y
+        self.heading: float = heading
 
     def __add__(self, transform2D: Transform2D):  # Apply transform
         rad = radians(self.heading)
@@ -59,7 +59,7 @@ class Pose2D:
         return Pose2D(newX, newY, newHeading)
 
 
-# ----------------------------- controll classes
+# ----------------------------- control classes
 class PID:
     def __init__(
         self,
@@ -139,7 +139,7 @@ class PID:
         return abs(self.setpoint - measured_value) <= self.tolerance
 
 
-class Odometry:
+class PathFinding:  # Make pose 2d
     def __init__(self, brain: Brain, rows: int, cols: int, blocked: list[tuple[int]]):
         # For logging
         self.brain: Brain = brain
@@ -282,6 +282,253 @@ class Odometry:
         # print()
 
 
+class VisionFruit:
+    def __init__(
+        self,
+        brain: Brain,
+        tagMap: dict[int, Pose2D],
+    ):
+        # For logging
+        self.brain: Brain = brain
+
+        # fruit color configs
+        self.greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
+        self.orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
+        self.yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
+
+        # camera const
+        self.camWidth = 320
+        self.camHeight = 240
+        self.camVertFOV = 68
+        self.camHorizFOV = 74
+        self.degPerPixelWidth = self.camHorizFOV / self.camWidth
+        # vision config
+        self.aiVision = AiVision(
+            Ports.PORT14, self.greenFruit, self.orangeFruit, self.yellowFruit
+        )
+
+        # arrays of fruit
+        self.fruitObjects: dict[str, list[Fruit]] = {}
+
+        self.strategy: list[str] = []
+        self.strategyColors: list[str] = []
+
+        self.largeFruitRatio = 1.1  # guess
+        self.smallFruitRatio = 0.5  # guess
+        self.fruitSizeTolerance = 0.05  # guess
+
+        # ----------- April Tags
+        self.tagWidth: float = 10  # guess
+        self.cameraToRobot = Transform2D(-20, 10, 0)  # guess
+
+        self.tagMap = tagMap  # guess
+
+    def setStrategy(self, strategy: list[str]):
+        self.strategy = strategy
+        self.strategyColors: list[str] = self.colorsFromStrategy(self.strategy)
+
+    def colorsFromStrategy(self, fruitPickingStrategy: list[str]) -> list[str]:
+        colors = []
+        seen = set()
+        for col in fruitPickingStrategy:
+            color = col.split("_")[1]
+            if color not in seen:
+                colors.append(color)
+                seen.add(color)
+        return colors
+
+    def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
+        fruit = Fruit()
+        fruit.originX = obj.originX
+        fruit.originY = obj.originY
+        fruit.centerX = obj.centerX
+        fruit.centerY = obj.centerY
+        fruit.width = obj.width
+        fruit.height = obj.height
+        fruit.score = obj.score
+        fruit.fruitColor = color
+        fruit.widthHeightRatio = fruit.width / fruit.height
+
+        return fruit
+
+    def fruitDist(
+        self, pixelWidth, ObjectWidthIn
+    ):  # OLD FIX!! deferent size fruit, take fruit object
+        angularWidth = self.degPerPixelWidth * pixelWidth
+        return (ObjectWidthIn * 0.5) / tan(radians(angularWidth * 0.5))
+
+    def updateFruit(self) -> bool:  # Older might want to rework
+        """
+        ### Parameters
+        none
+        ### What it does
+        updates the objects inside the vision class with what the camera seas
+        ### return
+        returns true if the camera detects and object, detects objects in search order,
+        once object is detected returns true, of no objects reruns false
+
+        """
+        self.fruitObjects.clear()
+
+        for color in self.strategyColors:
+            if color.lower() == "green":
+                for obj in self.aiVision.take_snapshot(self.greenFruit):
+                    tempFruit = self.makeFruitFromVisionObject(obj, "green")
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Large_Green" not in self.fruitObjects:
+                            self.fruitObjects["Large_Green"] = []
+                        self.fruitObjects["Large_Green"].append(tempFruit)
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Small_Green" not in self.fruitObjects:
+                            self.fruitObjects["Small_Green"] = []
+                        self.fruitObjects["Small_Green"].append(tempFruit)
+            elif color.lower() == "orange":
+                for obj in self.aiVision.take_snapshot(self.orangeFruit):
+                    tempFruit = self.makeFruitFromVisionObject(obj, "orange")
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Large_Orange" not in self.fruitObjects:
+                            self.fruitObjects["Large_Orange"] = []
+                        self.fruitObjects["Large_Orange"].append(tempFruit)
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Small_Orange" not in self.fruitObjects:
+                            self.fruitObjects["Small_Orange"] = []
+                        self.fruitObjects["Small_Orange"].append(tempFruit)
+            elif color.lower() == "yellow":
+                for obj in self.aiVision.take_snapshot(self.yellowFruit):
+                    tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Large_Yellow" not in self.fruitObjects:
+                            self.fruitObjects["Large_Yellow"] = []
+                        self.fruitObjects["Large_Yellow"].append(tempFruit)
+                    if (
+                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
+                        < self.fruitSizeTolerance
+                    ):
+                        if "Small_Yellow" not in self.fruitObjects:
+                            self.fruitObjects["Small_Yellow"] = []
+                        self.fruitObjects["Small_Yellow"].append(tempFruit)
+            if self.strategy[self.strategyColors.index(color)] in self.fruitObjects:
+                return True
+        # need the not not to return a boolean
+        return not not self.fruitObjects
+
+    def averageAnglesWeighted(self, degreesList: list[float], weights):
+        sumSin = sum(w * sin(radians(a)) for a, w in zip(degreesList, weights))
+        sumCos = sum(w * cos(radians(a)) for a, w in zip(degreesList, weights))
+        return degrees(atan2(sumSin, sumCos)) % 360
+
+    def cameraPlaneToTransform2d(
+        self,
+        x: float,
+        width: float,
+        angleDeg: float,
+    ) -> Transform2D:
+        # Estimate distance using width of tag and focal length
+        # depth = (real_width * focal_length) / apparent_width
+        depth = (self.tagWidth * self.degPerPixelWidth) / width
+
+        # Convert image-plane x, y into real-world x, y at the estimated depth
+        # Assuming camera is centered at (0, 0)
+        scale = depth / self.degPerPixelWidth
+        realX = x * scale
+
+        return Transform2D(depth, realX, angleDeg)
+
+    def captureTags(self) -> list[dict]:
+        tags = self.aiVision.take_snapshot(AiVision.ALL_TAGS)
+
+        formattedTags: list[dict] = []
+        if tags:
+            for tag in tags:
+                tempDict = {}
+
+                tempDict["id"] = tag.id
+                tempDict["transform"] = self.cameraPlaneToTransform2d(
+                    tag.centerX, tag.width, tag.angle
+                )
+                tempDict["vision_score"] = tag.score
+                formattedTags.append(tempDict)
+        return formattedTags
+
+    def getRobotPoseWithTags(self) -> Pose2D:
+        tags = self.captureTags()
+        # --- Process detections ---
+        weightedX = 0.0
+        weightedY = 0.0
+        weightedHeadings = []
+        weights = []
+
+        for tag in tags:
+            tagID: int = tag["id"]
+            relTransform2d: Transform2D = tag["transform"]
+            visionScore: float = tag["vision_score"]
+
+            if tagID not in self.tagMap or visionScore <= 0:
+                continue
+
+            tagPose = self.tagMap[tagID]
+
+            tagToCamera = relTransform2d.inverse()
+            tagToRobot = tagToCamera + self.cameraToRobot
+            robotPose: Pose2D = tagPose + tagToRobot
+
+            # Distance-based score
+            distance = sqrt(relTransform2d.dX**2 + relTransform2d.dY**2)
+            if distance != 0:
+                distanceScore = 1 / (distance)
+            else:
+                distanceScore = 0
+
+            # can add weight to make vision score have more of a impact
+            finalScore = visionScore * distanceScore
+
+            weightedX += robotPose.x * finalScore
+            weightedY += robotPose.y * finalScore
+            weightedHeadings.append(robotPose.heading)
+            weights.append(finalScore)
+        # --- Final weighted average ---
+        if weights:
+            totalWeight = sum(weights)
+            avgX = weightedX / totalWeight
+            avgY = weightedY / totalWeight
+            avg_heading = self.averageAnglesWeighted(weightedHeadings, weights)
+
+            finalPose = Pose2D(avgX, avgY, avg_heading)
+            return finalPose
+        else:
+            return None
+
+
+class Odometry:
+    def __init__(self, brain, visionFruit: VisionFruit):
+        # For logging
+        self.brain: Brain = brain
+
+        self.visionFruit: VisionFruit = visionFruit
+        self.pose: Pose2D = Pose2D(0, 0, 0)
+
+    def update(self):
+        self.pose = self.visionFruit.getRobotPoseWithTags()
+
+    def getPosition(self) -> Pose2D:
+        return self.pose
+
+
 class HDrive:
     def __init__(
         self,
@@ -291,6 +538,9 @@ class HDrive:
         lineLeft: Line,
         lineRight: Line,
     ):
+        # For logging
+        self.brain: Brain = brain
+
         self.odometry: Odometry = odometry
         # Robot Const
 
@@ -299,8 +549,6 @@ class HDrive:
 
         self.wheelDiameter: float = 4
         self.wheelCircumstance: float = self.wheelDiameter * pi
-
-        self.brain = brain
 
         self.maxWhealSpeed: float = 175
         # Motors
@@ -483,275 +731,39 @@ class HDrive:
 
     # center of robot
     def driveToPosition(self, posX: float, posY: float, targetAngle: float):
-        x, y = self.odometry.getPosition()
+        pose: Pose2D = self.odometry.getPosition()
 
-        forward = self.positionPIDY.update(measured=y, setpoint=posY)
-        strafe = self.positionPIDX.update(measured=x, setpoint=posX)
+        forward = self.positionPIDY.update(pose.x, posY)
+        strafe = self.positionPIDX.update(pose.y, posX)
 
         self.fieldCentricTargetAngleDrive(forward, strafe, targetAngle)
 
-        return self.positionPIDY.atGoal(y) and self.positionPIDY.atGoal(x)
-
-
-class VisionFruit:
-    def __init__(
-        self,
-        brain: Brain,
-        tagMap: dict[int, Pose2D],
-    ):
-        # For logging
-        self.brain: Brain = brain
-
-        # fruit color configs
-        self.greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
-        self.orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
-        self.yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
-
-        # camera const
-        self.camWidth = 320
-        self.camHeight = 240
-        self.camVertFOV = 68
-        self.camHorizFOV = 74
-        self.degPerPixelWidth = self.camHorizFOV / self.camWidth
-        # vision config
-        self.aiVision = AiVision(
-            Ports.PORT14, self.greenFruit, self.orangeFruit, self.yellowFruit
-        )
-
-        # arrays of fruit
-        self.fruitObjects: dict[str, list[Fruit]] = {}
-
-        self.strategy: list[str] = []
-        self.strategyColors: list[str] = []
-
-        self.largeFruitRatio = 1.1  # guess
-        self.smallFruitRatio = 0.5  # guess
-        self.fruitSizeTolerance = 0.05  # guess
-
-        # ----------- April Tags
-        self.tagWidth: float = 10  # guess
-        self.CameraToRobot = Transform2D(-20, 10, 0)  # guess
-
-        self.tagMap = tagMap  # guess
-
-    def setStrategy(self, strategy: list[str]):
-        self.strategy = strategy
-        self.strategyColors: list[str] = self.colorsFromStrategy(self.strategy)
-
-    def colorsFromStrategy(self, fruitPickingStrategy: list[str]) -> list[str]:
-        colors = []
-        seen = set()
-        for col in fruitPickingStrategy:
-            color = col.split("_")[1]
-            if color not in seen:
-                colors.append(color)
-                seen.add(color)
-        return colors
-
-    def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
-        fruit = Fruit()
-        fruit.originX = obj.originX
-        fruit.originY = obj.originY
-        fruit.centerX = obj.centerX
-        fruit.centerY = obj.centerY
-        fruit.width = obj.width
-        fruit.height = obj.height
-        fruit.score = obj.score
-        fruit.fruitColor = color
-        fruit.widthHeightRatio = fruit.width / fruit.height
-
-        return fruit
-
-    def fruitDist(
-        self, pixelWidth, ObjectWidthIn
-    ):  # OLD FIX!! deferent size fruit, take fruit object
-        angularWidth = self.degPerPixelWidth * pixelWidth
-        return (ObjectWidthIn * 0.5) / tan(radians(angularWidth * 0.5))
-
-    def updateFruit(self) -> bool:  # Older might want to rework
-        """
-        ### Parameters
-        none
-        ### What it does
-        updates the objects inside the vision class with what the camera seas
-        ### return
-        returns true if the camera detects and object, detects objects in serch order,
-        once object is detected returns true, of no objects retuncs false
-
-        """
-        self.fruitObjects.clear()
-
-        for color in self.strategyColors:
-            if color.lower() == "green":
-                for obj in self.aiVision.take_snapshot(self.greenFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "green")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Green" not in self.fruitObjects:
-                            self.fruitObjects["Large_Green"] = []
-                        self.fruitObjects["Large_Green"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Green" not in self.fruitObjects:
-                            self.fruitObjects["Small_Green"] = []
-                        self.fruitObjects["Small_Green"].append(tempFruit)
-            elif color.lower() == "orange":
-                for obj in self.aiVision.take_snapshot(self.orangeFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "orange")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Orange" not in self.fruitObjects:
-                            self.fruitObjects["Large_Orange"] = []
-                        self.fruitObjects["Large_Orange"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Orange" not in self.fruitObjects:
-                            self.fruitObjects["Small_Orange"] = []
-                        self.fruitObjects["Small_Orange"].append(tempFruit)
-            elif color.lower() == "yellow":
-                for obj in self.aiVision.take_snapshot(self.yellowFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Yellow" not in self.fruitObjects:
-                            self.fruitObjects["Large_Yellow"] = []
-                        self.fruitObjects["Large_Yellow"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Yellow" not in self.fruitObjects:
-                            self.fruitObjects["Small_Yellow"] = []
-                        self.fruitObjects["Small_Yellow"].append(tempFruit)
-            if self.strategy[self.strategyColors.index(color)] in self.fruitObjects:
-                return True
-        # need the not not to return a boolean
-        return not not self.fruitObjects
-
-    def average_angles_weighted(self, degreesList: list[float], weights):
-        sumSin = sum(w * sin(radians(a)) for a, w in zip(degreesList, weights))
-        sumCos = sum(w * cos(radians(a)) for a, w in zip(degreesList, weights))
-        return degrees(atan2(sumSin, sumCos)) % 360
-
-    def camera_plane_to_transform2d(
-        self,
-        x: float,
-        y: float,
-        width: float,
-        angleDeg: float,
-        tag_physical_width: float,
-    ) -> Transform2D:
-        """
-        Estimate the 2D transform from the camera to a tag using pinhole geometry.
-        """
-        # Estimate distance using width of tag and focal length
-        # depth = (real_width * focal_length) / apparent_width
-        depth = (tag_physical_width * self.degPerPixelWidth) / width
-
-        # Convert image-plane x, y into real-world x, y at the estimated depth
-        # Assuming camera is centered at (0, 0)
-        scale = depth / self.degPerPixelWidth
-        realX = x * scale
-        realY = y * scale
-
-        return Transform2D(depth, realX, angleDeg)
-
-    def captureTags(self) -> list[dict]:
-        tags = self.aiVision.take_snapshot(AiVision.ALL_TAGS)
-
-        formattedTags: list[dict] = []
-        if tags:
-            for tag in tags:
-                tempDict = {}
-
-                tempDict["id"] = tag.id
-                tempDict["transform"] = tag.id
-                tempDict["vision_score"] = tag.score
-
-            {"id": 1, "transform": Transform2D(-100, 0, 5), "vision_score": 0.95},
-            {"id": 2, "transform": Transform2D(-200, 100, 4), "vision_score": 0.7},
-            {"id": 3, "transform": Transform2D(-80, -40, 6), "vision_score": 0.4},
-
-    def getRobotPoseWithTags(self):
-        # --- Process detections ---
-        weighted_x = 0.0
-        weighted_y = 0.0
-        weighted_headings = []
-        weights = []
-
-        for detection in detections:
-            tag_id = detection["id"]
-            rel_transform = detection["transform"]
-            vision_score = detection["vision_score"]
-
-            if tag_id not in tag_map or vision_score <= 0:
-                continue
-
-            tag_pose = tag_map[tag_id]
-
-            tag_to_camera = rel_transform.inverse()
-            tag_to_robot = tag_to_camera + camera_to_robot
-            robot_pose = tag_pose + tag_to_robot
-
-            # Distance-based score
-            distance = sqrt(rel_transform.dx**2 + rel_transform.dy**2)
-            distance_score = 1 / (distance + 1e-5)
-
-            # Final score = vision_score × distance_score
-            final_score = vision_score * distance_score
-
-            weighted_x += robot_pose.x * final_score
-            weighted_y += robot_pose.y * final_score
-            weighted_headings.append(robot_pose.heading)
-            weights.append(final_score)
-        # --- Final weighted average ---
-        if weights:
-            total_weight = sum(weights)
-            avg_x = weighted_x / total_weight
-            avg_y = weighted_y / total_weight
-            avg_heading = average_angles_weighted(weighted_headings, weights)
-
-            final_pose = Pose2D(avg_x, avg_y, avg_heading)
-            print("Final distance-weighted robot pose:", final_pose)
-        else:
-            print("No valid detections.")
-
-
-# --- Simulated detections (no score given yet) ---
-detections = [
-    {"id": 1, "transform": Transform2D(-100, 0, 5)},
-    {"id": 2, "transform": Transform2D(-200, 100, 4)},
-    {"id": 3, "transform": Transform2D(-80, -40, 6)},
-]
+        return self.positionPIDY.atGoal(pose.y) and self.positionPIDY.atGoal(pose.x)
 
 
 class Arm:
-    def __init__(self):
-
+    def __init__(self, brain: Brain):
+        # For logging
+        self.brain: Brain = brain
         self.driveRatio = 4
         self.armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
-        # self.positionPIDX = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
 
-    def controlController(self, controller: Controller):
+        self.PIDArm = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+
+    def pidControl(self, controller: Controller):
         # horizontal 0
         # vertical -680
         # other horizontal -1250
+        if controller.buttonA:
+            self.PIDArm.setSetpoint(-1250)
+        if controller.buttonA:
+            self.PIDArm.setSetpoint(-680)
+        if controller.buttonA:
+            self.PIDArm.setSetpoint(0)
 
-        brain.screen.print_at(self.armMotor.position(DEGREES), x=40, y=40)
-        if not abs(controller.axis2.position()) < 0.05:
-            self.armMotor.spin(FORWARD, controller.axis2.position() * 50, RPM)
-        else:
-            self.armMotor.stop(HOLD)
+        self.armMotor.spin(
+            FORWARD, self.PIDArm.update(self.armMotor.position(DEGREES)), RPM
+        )
 
 
 # --------------- configs and stuff
@@ -799,10 +811,11 @@ lineRight = Line(brain.three_wire_port.b)
 controller = Controller(PRIMARY)
 
 # Classes
-field = Odometry(brain, 20, 50, blocked)
+vision = VisionFruit(brain, tagMap)
+field = PathFinding(brain, 20, 50, blocked)
+odometry = Odometry(brain, vision)
 hDrive = HDrive(brain, field, imu, lineLeft, lineRight)
 arm = Arm(brain)
-vision = VisionFruit(brain, tagMap)
 
 # ------------------------  calibrate shit here and zero
 
@@ -825,4 +838,7 @@ brain.screen.print("Finished Calibrating")
 
 # ---------------------------   RUN CODE HERE
 while True:
+    odometry.update()
+
     hDrive.driveController(controller)
+    arm.pidControl(controller)
