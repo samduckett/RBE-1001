@@ -1,3 +1,4 @@
+# endregion VEXcode Generated Robot Configuration
 from vex import *
 from math import *
 
@@ -22,18 +23,8 @@ class Fruit:
         self.widthHeightRatio: float = 0
 
 
-class GridNode:
-    def __init__(self, row, col):
-        self.row: int = row
-        self.col: int = col
-        self.dist: int = 999
-        self.previous: GridNode = None
-        self.neighbors: list[GridNode] = []
-        self.blocked: bool = False
-
-
 class Transform2D:
-    def __init__(self, dX, dY, dTheta):
+    def __init__(self, dX, dY, dTheta=0):
         self.dX: float = dX
         self.dY: float = dY
         self.dTheta: float = dTheta
@@ -46,7 +37,7 @@ class Transform2D:
 
 
 class Pose2D:
-    def __init__(self, x, y, heading):
+    def __init__(self, x, y, heading=0):
         self.x: float = x
         self.y: float = y
         self.heading: float = heading
@@ -57,6 +48,50 @@ class Pose2D:
         newY = self.y + sin(rad) * transform2D.dX + cos(rad) * transform2D.dY
         newHeading = (self.heading + transform2D.dTheta) % 360
         return Pose2D(newX, newY, newHeading)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, Pose2D)
+            and self.x == other.x
+            and self.y == other.y
+            and self.heading == other.heading
+        )
+
+    def __hash__(self):
+        return hash((self.x, self.y, self.heading))
+
+    def __lt__(self, other):
+        if not isinstance(other, Pose2D):
+            return NotImplemented
+        return (self.x, self.y, self.heading) < (other.x, other.y, other.heading)
+
+    def __repr__(self):
+        return (
+            "Pose2D(x="
+            + str(self.x)
+            + ","
+            + str(self.y)
+            + ","
+            + str(self.heading)
+            + ")"
+        )
+
+
+# -------------------------  Consts
+# Cardinal movements
+CARDINAL_DIRECTIONS = {
+    "N": Transform2D(0, -1),
+    "S": Transform2D(0, 1),
+    "E": Transform2D(1, 0),
+    "W": Transform2D(-1, 0),
+}
+
+DIAGONAL_DIRECTIONS = {
+    "NE": Transform2D(1, -1),
+    "SE": Transform2D(1, 1),
+    "SW": Transform2D(-1, 1),
+    "NW": Transform2D(-1, -1),
+}
 
 
 # ----------------------------- control classes
@@ -139,147 +174,229 @@ class PID:
         return abs(self.setpoint - measured_value) <= self.tolerance
 
 
-class PathFinding:  # Make pose 2d
-    def __init__(self, brain: Brain, rows: int, cols: int, blocked: list[tuple[int]]):
-        # For logging
-        self.brain: Brain = brain
+# class AStarSolver:
+#     def __init__(
+#         self,
+#         fieldSize: Tuple[int, int],
+#         robotRadius: float = 0.5,
+#         obstacles: set[Pose2D] = set(),
+#     ):
+#         self.fieldSize: float = fieldSize
+#         self.robotRadius: float = robotRadius
+#         self.lastObstacles: set[Pose2D] = obstacles
 
-        # initiate a dijkstra object with grid size and blocked intersections
-        self.rows: int = rows
-        self.cols: int = cols
-        self.current: tuple[int, int] = (0, 0)
-        self.grid: dict[tuple[int, int], GridNode] = {}
+#         self.inflatedObstacles: set[Pose2D] = set()
+#         self.inflatedObstacles: set[Pose2D] = self.inflateObstacles(self.lastObstacles)
 
-        for row in range(self.rows):
-            for col in range(self.cols):
-                self.grid[(row, col)] = GridNode(row, col)
+#         self.turn_penalty = 10
+#         self.wall_penalty = 4
+#         self.move_penalty = 1
+#         self.diagonal_penalty = 2.5
+#         self.obstacles_penalty = 3
 
-        for block in blocked:
-            self.grid[block].blocked = True
+#     def inflateObstacles(self, obstacles: set[Pose2D]) -> set[Pose2D]:
+#         pass
 
-        for n in self.grid.values():
-            node: GridNode = n
-            if node.row < self.rows - 1:
-                node.neighbors.append(self.grid[(node.row + 1, node.col)])
-            if node.row > 0:
-                node.neighbors.append(self.grid[(node.row - 1, node.col)])
-            if node.col < self.cols - 1:
-                node.neighbors.append(self.grid[(node.row, node.col + 1)])
-            if node.col > 0:
-                node.neighbors.append(self.grid[(node.row, node.col - 1)])
+#     #     """Inflate obstacles and store them in memory only when obstacles change."""
+#     #     # If the obstacles haven't changed, return the cached inflated obstacles
+#     #     if obstacles == self.lastObstacles and self.inflatedObstacles:
+#     #         return self.inflatedObstacles
 
-    def get_node(self, loc: tuple[int, int]):
-        return self.grid[loc]
+#     #     inflated = set()
+#     #     inflationRange = ceil(self.robotRadius)
 
-    def computePath(self, final: tuple[int, int]) -> list[tuple[int, int]]:
-        # creates a queue setting all distances to 100 and the current to previous using dictionary
-        for node in self.grid:
-            self.grid[node].dist = 100
-        self.grid[self.current].dist = 0
-        self.grid[self.current].previous = None
+#     #     for obs in obstacles:
+#     #         for dx in range(-inflationRange, inflationRange + 1):
+#     #             for dy in range(-inflationRange, inflationRange + 1):
+#     #                 if abs(dx) + abs(dy) <= inflationRange:
+#     #                     inflatedX = obs.x + dx
+#     #                     inflatedY = obs.y + dy
+#     #                     if (
+#     #                         0 <= inflatedX < self.fieldSize[0]
+#     #                         and 0 <= inflatedY < self.fieldSize[1]
+#     #                     ):
+#     #                         inflated.add(Pose2D(inflatedX, inflatedY, obs.heading))
 
-        startNode: GridNode = self.get_node(self.current)
-        queue: list[GridNode] = [startNode]
+#     #     # Update the cached values
+#     #     self.inflatedObstacles = inflated
+#     #     self.lastObstacles = obstacles  # Store the current obstacles for comparison
+#     #     return inflated
 
-        # sets distance between nodes and prior node
-        while queue:
-            currentNode = queue.pop(0)
-            if currentNode.blocked:
-                continue
-            for neighbor in currentNode.neighbors:
-                if neighbor.blocked:
-                    continue
-                newDist = currentNode.dist + 1
-                if newDist < neighbor.dist:
-                    neighbor.dist = newDist
-                    neighbor.previous = currentNode
-                    if neighbor not in queue:
-                        queue.append(neighbor)
-        # makes path end to start
-        path = []
-        finalNode = self.get_node(final)
-        while finalNode:
-            path.append((finalNode.row, finalNode.col))
-            finalNode = finalNode.previous
+#     # def heuristic(self, a: Pose2D, b: Pose2D) -> float:
+#     #     """Calculate Manhattan distance heuristic."""
+#     #     distance = abs(a.x - b.x) + abs(a.y - b.y)
+#     #     return distance
 
-        # flips and returns path
-        path.reverse()
-        self.current = final
-        path = self.optimizePath(path)
-        return path
+#     # def simplifyPathWithDiagonals(self, path: list[Pose2D]) -> list[Pose2D]:
+#     #     """Simplify the path by removing unnecessary waypoints, including diagonal directions."""
+#     #     if len(path) < 3:
+#     #         return path
 
-    def optimizePath(self, path: list[tuple[int, int]]) -> list[tuple[int, int]]:
-        if len(path) < 3:
-            return path
+#     #     simplified = [path[0]]
 
-        simplified = [path[0]]  # Start with the first point
+#     #     def direction(a: Pose2D, b: Pose2D) -> Tuple[int, int]:
+#     #         dx = b.x - a.x
+#     #         dy = b.y - a.y
+#     #         return (dx, dy)
 
-        i = 1
-        while i < len(path) - 1:
-            start = simplified[-1]
-            curr = path[i]
-            next = path[i + 1]
+#     #     prev_dir = direction(path[0], path[1])
 
-            # Get direction vectors
-            dx1, dy1 = curr[0] - start[0], curr[1] - start[1]
-            dx2, dy2 = next[0] - curr[0], next[1] - curr[1]
+#     #     for i in range(1, len(path) - 1):
+#     #         curr_dir = direction(path[i], path[i + 1])
+#     #         if curr_dir != prev_dir:
+#     #             simplified.append(path[i])
+#     #             prev_dir = curr_dir
 
-            # Normalize directions
-            if dx1 != 0:
-                dx1 //= abs(dx1)
-            if dy1 != 0:
-                dy1 //= abs(dy1)
-            if dx2 != 0:
-                dx2 //= abs(dx2)
-            if dy2 != 0:
-                dy2 //= abs(dy2)
+#     #     simplified.append(path[-1])
+#     #     return simplified
 
-            if (dx1, dy1) == (dx2, dy2):
-                # Same direction, check how long it goes
-                direction = (dx1, dy1)
-                runEnd = i + 1
-                while runEnd + 1 < len(path):
-                    nextDir = (
-                        path[runEnd + 1][0] - path[runEnd][0],
-                        path[runEnd + 1][1] - path[runEnd][1],
-                    )
-                    if nextDir[0] != 0:
-                        nextDir = (nextDir[0] // abs(nextDir[0]), nextDir[1])
-                    if nextDir[1] != 0:
-                        nextDir = (nextDir[0], nextDir[1] // abs(nextDir[1]))
-                    if nextDir == direction:
-                        runEnd += 1
-                    else:
-                        break
+#     # def printGrid(self, path: list[Pose2D], start: Pose2D, goal: Pose2D) -> None:
+#     #     pass
+#     #     # """Print grid with obstacles, path, and start/goal, including axis numbers (double-digit safe)."""
+#     #     # width, height = self.fieldSize
+#     #     # grid = [[" " for _ in range(width)] for _ in range(height)]
 
-                # Add the endpoint of the run and skip the middle ones
-                simplified.append(path[runEnd])
-                i = runEnd + 1
-            else:
-                simplified.append(curr)
-                i += 1
+#     #     # def clamp(value, max_val):
+#     #     #     return max(0, min(int(value), max_val - 1))
 
-        # Add last point if it wasn't included
-        if simplified[-1] != path[-1]:
-            simplified.append(path[-1])
+#     #     # # Place inflated obstacles
+#     #     # for obs in self.inflatedObstacles:
+#     #     #     x = clamp(obs.x, width)
+#     #     #     y = clamp(obs.y, height)
+#     #     #     grid[y][x] = "#"
 
-        return simplified
+#     #     # # Place original obstacles
+#     #     # for obs in self.lastObstacles:
+#     #     #     x = clamp(obs.x, width)
+#     #     #     y = clamp(obs.y, height)
+#     #     #     grid[y][x] = "X"
 
-    def print_grid(self):
-        pass
-        # spacing = 1
-        # print("  " + " " * (spacing + 1), end="")
-        # for col in range(self.cols):
-        #     print("\033[4m" + " " * spacing + f"{col}".zfill(2) + "\033[0m", end="")
-        # for row in range(self.rows):
-        #     print("\n" + f"{row}".zfill(2) + " " * spacing + "|", end="")
-        #     for col in range(self.cols):
-        #         node = self.get_node((row, col))
-        #         print(
-        #             " " * spacing + ("  " if node.blocked else f"{node.dist}".zfill(2)),
-        #             end="",
-        #         )
-        # print()
+#     #     # # Place path
+#     #     # for pose in path:
+#     #     #     x = clamp(pose.x, width)
+#     #     #     y = clamp(pose.y, height)
+#     #     #     grid[y][x] = "*"
+
+#     #     # # Place start and goal
+#     #     # sx = clamp(start.x, width)
+#     #     # sy = clamp(start.y, height)
+#     #     # gx = clamp(goal.x, width)
+#     #     # gy = clamp(goal.y, height)
+#     #     # grid[sy][sx] = "R"
+#     #     # grid[gy][gx] = "G"
+
+#     #     # print("\nGrid:")
+
+#     #     # # Calculate padding based on max column number
+#     #     # col_width = len(str(width - 1)) + 1  # +1 for spacing
+
+#     #     # # Print grid rows with Y-axis labels
+#     #     # for y in reversed(range(height)):
+#     #     #     row_label = f"{y:>{col_width}} |"
+#     #     #     row_data = "".join(f"{cell:>{col_width}}" for cell in grid[y])
+#     #     #     print(row_label + row_data)
+
+#     #     # # Print separator
+#     #     # print(" " * (col_width + 1) + "-" * (width * col_width))
+
+#     #     # # Print X-axis labels
+#     #     # col_numbers = " " * (col_width + 1)
+#     #     # for x in range(width):
+#     #     #     col_numbers += f"{x:>{col_width}}"
+#     #     # print(col_numbers)
+
+#     # def distance_to_obstacles(self, point: Pose2D, obstacles: Set[Pose2D]) -> float:
+#     #     """Calculate the minimum distance from a point to the nearest obstacle."""
+#     #     min_distance = float("inf")
+#     #     for obs in obstacles:
+#     #         dist = sqrt((point.x - obs.x) ** 2 + (point.y - obs.y) ** 2)
+#     #         min_distance = min(min_distance, dist)
+#     #     return min_distance
+
+#     # def is_near_boundary(self, position: Pose2D) -> bool:
+#     #     return (
+#     #         position.x == 0
+#     #         or position.x == self.fieldSize[0] - 1
+#     #         or position.y == 0
+#     #         or position.y == self.fieldSize[1] - 1
+#     #     )
+
+#     # def a_star_pose2d(
+#     #     self,
+#     #     start: Pose2D,
+#     #     goal: Pose2D,
+#     #     obstacles: Set[Pose2D] = None,
+#     # ):
+#     #     """A* algorithm to find the shortest path with penalties for turning, wall proximity, and obstacle proximity."""
+#     #     obstacles = obstacles or self.inflatedObstacles
+
+#     #     open_set = []
+#     #     heapq.heappush(open_set, (0, start, None))  # (f, position, last_direction)
+
+#     #     came_from = {}
+#     #     g_score = {(start, None): 0}
+
+#     #     while open_set:
+#     #         _, current, last_dir = heapq.heappop(open_set)
+
+#     #         if current == goal:
+#     #             path = [current]
+#     #             key = (current, last_dir)
+#     #             while key in came_from:
+#     #                 key = came_from[key]
+#     #                 path.append(key[0])
+
+#     #             # Print the grid and path
+#     #             self.printGrid(path, start, goal)
+
+#     #             # Optimize path by simplifying direction changes
+#     #             path = self.simplifyPathWithDiagonals(path)
+
+#     #             return path[::-1]
+
+#     #         for direction, delta in {
+#     #             **CARDINAL_DIRECTIONS,
+#     #             **DIAGONAL_DIRECTIONS,
+#     #         }.items():
+#     #             neighbor = current + delta
+
+#     #             if not (
+#     #                 0 <= neighbor.x < self.fieldSize[0]
+#     #                 and 0 <= neighbor.y < self.fieldSize[1]
+#     #             ):
+#     #                 continue
+#     #             if neighbor in obstacles:
+#     #                 continue
+
+#     #             # Apply penalties:
+#     #             move_cost = self.move_penalty
+
+#     #             # Extra cost for diagonal movement
+#     #             if direction in DIAGONAL_DIRECTIONS:
+#     #                 move_cost += self.diagonal_penalty
+
+#     #             # Large penalty for turning to encourage smoother motion
+#     #             if last_dir and last_dir != direction:
+#     #                 move_cost += self.turn_penalty
+
+#     #             # Smaller penalty for proximity to walls
+#     #             if self.is_near_boundary(neighbor):
+#     #                 move_cost += self.wall_penalty
+
+#     #             # Penalty for being too close to obstacles
+#     #             if self.distance_to_obstacles(neighbor, obstacles) < 2:
+#     #                 move_cost += self.obstacles_penalty
+
+#     #             tentative_g = g_score[(current, last_dir)] + move_cost
+#     #             neighbor_key = (neighbor, direction)
+
+#     #             if neighbor_key not in g_score or tentative_g < g_score[neighbor_key]:
+#     #                 came_from[neighbor_key] = (current, last_dir)
+#     #                 g_score[neighbor_key] = tentative_g
+#     #                 f_score = tentative_g + self.heuristic(neighbor, goal)
+#     #                 heapq.heappush(open_set, (f_score, neighbor, direction))
+
+#     #     return None
 
 
 class VisionFruit:
@@ -304,7 +421,11 @@ class VisionFruit:
         self.degPerPixelWidth = self.camHorizFOV / self.camWidth
         # vision config
         self.aiVision = AiVision(
-            Ports.PORT14, self.greenFruit, self.orangeFruit, self.yellowFruit
+            Ports.PORT14,
+            self.greenFruit,
+            self.orangeFruit,
+            self.yellowFruit,
+            AiVision.ALL_TAGS,
         )
 
         # arrays of fruit
@@ -351,81 +472,54 @@ class VisionFruit:
 
         return fruit
 
-    def fruitDist(
-        self, pixelWidth, ObjectWidthIn
-    ):  # OLD FIX!! deferent size fruit, take fruit object
+    def fruitDist(self, pixelWidth, ObjectWidthIn):
+        # OLD FIX!! deferent size fruit, take fruit object
         angularWidth = self.degPerPixelWidth * pixelWidth
         return (ObjectWidthIn * 0.5) / tan(radians(angularWidth * 0.5))
 
-    def updateFruit(self) -> bool:  # Older might want to rework
-        """
-        ### Parameters
-        none
-        ### What it does
-        updates the objects inside the vision class with what the camera seas
-        ### return
-        returns true if the camera detects and object, detects objects in search order,
-        once object is detected returns true, of no objects reruns false
+    # def updateFruit(self) -> bool:
+    #     """
+    #     Updates the vision-based fruit detection. Returns True if any fruit matching
+    #     the strategy is detected, otherwise False.
+    #     """
+    #     self.fruitObjects.clear()
 
-        """
-        self.fruitObjects.clear()
+    #     colorSensors = {
+    #         "green": self.greenFruit,
+    #         "orange": self.orangeFruit,
+    #         "yellow": self.yellowFruit,
+    #     }
 
-        for color in self.strategyColors:
-            if color.lower() == "green":
-                for obj in self.aiVision.take_snapshot(self.greenFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "green")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Green" not in self.fruitObjects:
-                            self.fruitObjects["Large_Green"] = []
-                        self.fruitObjects["Large_Green"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Green" not in self.fruitObjects:
-                            self.fruitObjects["Small_Green"] = []
-                        self.fruitObjects["Small_Green"].append(tempFruit)
-            elif color.lower() == "orange":
-                for obj in self.aiVision.take_snapshot(self.orangeFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "orange")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Orange" not in self.fruitObjects:
-                            self.fruitObjects["Large_Orange"] = []
-                        self.fruitObjects["Large_Orange"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Orange" not in self.fruitObjects:
-                            self.fruitObjects["Small_Orange"] = []
-                        self.fruitObjects["Small_Orange"].append(tempFruit)
-            elif color.lower() == "yellow":
-                for obj in self.aiVision.take_snapshot(self.yellowFruit):
-                    tempFruit = self.makeFruitFromVisionObject(obj, "yellow")
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.largeFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Large_Yellow" not in self.fruitObjects:
-                            self.fruitObjects["Large_Yellow"] = []
-                        self.fruitObjects["Large_Yellow"].append(tempFruit)
-                    if (
-                        abs(tempFruit.widthHeightRatio - self.smallFruitRatio)
-                        < self.fruitSizeTolerance
-                    ):
-                        if "Small_Yellow" not in self.fruitObjects:
-                            self.fruitObjects["Small_Yellow"] = []
-                        self.fruitObjects["Small_Yellow"].append(tempFruit)
-            if self.strategy[self.strategyColors.index(color)] in self.fruitObjects:
-                return True
-        # need the not not to return a boolean
-        return not not self.fruitObjects
+    #     for color, target in zip(self.strategyColors, self.strategy):
+    #         color = color.lower()
+    #         if color not in colorSensors:
+    #             continue
+
+    #         for obj in self.aiVision.take_snapshot(colorSensors[color]):
+    #             fruit = self.makeFruitFromVisionObject(obj, color)
+
+    #             # Check for large fruit
+    #             if (
+    #                 abs(fruit.widthHeightRatio - self.largeFruitRatio)
+    #                 < self.fruitSizeTolerance
+    #             ):
+    #                 self.fruitObjects.setdefault(
+    #                     f"Large_{color.capitalize()}", []
+    #                 ).append(fruit)
+
+    #             # Check for small fruit
+    #             if (
+    #                 abs(fruit.widthHeightRatio - self.smallFruitRatio)
+    #                 < self.fruitSizeTolerance
+    #             ):
+    #                 self.fruitObjects.setdefault(
+    #                     f"Small_{color.capitalize()}", []
+    #                 ).append(fruit)
+
+    #         if target in self.fruitObjects:
+    #             return True
+
+    #     return bool(self.fruitObjects)
 
     def averageAnglesWeighted(self, degreesList: list[float], weights):
         sumSin = sum(w * sin(radians(a)) for a, w in zip(degreesList, weights))
@@ -453,6 +547,7 @@ class VisionFruit:
         tags = self.aiVision.take_snapshot(AiVision.ALL_TAGS)
 
         formattedTags: list[dict] = []
+        brain.screen.print_at(formattedTags, x=40, y=60)
         if tags:
             for tag in tags:
                 tempDict = {}
@@ -550,7 +645,7 @@ class HDrive:
         self.wheelDiameter: float = 4
         self.wheelCircumstance: float = self.wheelDiameter * pi
 
-        self.maxWhealSpeed: float = 175
+        self.maxWheelSpeed: float = 175
         # Motors
         self.frontLeftMotor: Motor = Motor(Ports.PORT1, 18_1, False)
         self.frontRightMotor: Motor = Motor(Ports.PORT2, 18_1, True)
@@ -581,6 +676,8 @@ class HDrive:
         self.positionPIDX = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
         self.positionPIDY = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
 
+        self.controlerIndex = 0
+
     def configMotors(self):
         self.frontLeftMotor.reset_position()
         self.frontRightMotor.reset_position()
@@ -589,18 +686,18 @@ class HDrive:
         self.frontSideMotor.reset_position()
         self.backSideMotor.reset_position()
 
-    def rotateVector(self, x: float, y: float, angle: float):
+    def rotateVector(self, x: float, y: float, angle: float) -> tuple[float, float]:
         angleRad = radians(angle)
-        cos = cos(angleRad)
-        sin = sin(angleRad)
-        return (x * cos - y * sin, x * sin + y * cos)
+        cosRad = cos(angleRad)
+        sinRad = sin(angleRad)
+        return (x * cosRad - y * sinRad, x * sinRad + y * cosRad)
 
     def joystickToAngleDeg(self, x: float, y: float) -> float:
         rad = atan2(y, x)
         deg = degrees(rad)
         return deg % 360
 
-    def stop(self):
+    def stop(self) -> None:
         self.frontLeftMotor.stop(HOLD)
         self.frontRightMotor.stop(HOLD)
         self.backLeftMotor.stop(HOLD)
@@ -616,7 +713,7 @@ class HDrive:
         rrSpeed: float,
         fsSpeed: float,
         bsSpeed: float,
-    ):
+    ) -> None:
         self.frontLeftMotor.spin(FORWARD, flSpeed, RPM)
         self.frontRightMotor.spin(FORWARD, frSpeed, RPM)
         self.backLeftMotor.spin(FORWARD, rlSpeed, RPM)
@@ -625,67 +722,46 @@ class HDrive:
         self.frontSideMotor.spin(FORWARD, fsSpeed, RPM)
         self.backSideMotor.spin(FORWARD, bsSpeed, RPM)
 
-        brain.screen.print_at(flSpeed, x=40, y=40)
-        brain.screen.print_at(frSpeed, x=40, y=60)
-        brain.screen.print_at(rlSpeed, x=40, y=80)
-        brain.screen.print_at(rrSpeed, x=40, y=100)
-        brain.screen.print_at(fsSpeed, x=40, y=120)
-        brain.screen.print_at(bsSpeed, x=40, y=140)
-
     def arcadeDrive(
         self,
         forward: float,
         strafe: float,
         rotation: float,
-    ):
-        flSpeed = forward + rotation
-        frSpeed = forward - rotation
-        rlSpeed = forward + rotation
-        rrSpeed = forward - rotation
+    ) -> None:
+        # Calculate individual wheel speeds
+        fl = forward + rotation
+        fr = forward - rotation
+        rl = forward + rotation
+        rr = forward - rotation
+        fs = strafe
+        bs = strafe
 
-        # 2 center wheels: strafe only
-        fsSpeed = strafe
-        bsSpeed = strafe
+        # Pack into list for normalization
+        speeds = [fl, fr, rl, rr, fs, bs]
+        maxMagnitude = max(abs(s) for s in speeds)
 
-        # Normalize powers
-        maxSpeed = max(
-            abs(flSpeed),
-            abs(frSpeed),
-            abs(rlSpeed),
-            abs(rrSpeed),
-            abs(fsSpeed),
-            abs(bsSpeed),
-            self.maxWhealSpeed,
-        )
+        # Normalize if needed
+        if maxMagnitude > self.maxWheelSpeed:
+            speeds = [s / maxMagnitude * self.maxWheelSpeed for s in speeds]
 
-        frSpeed /= maxSpeed
-        flSpeed /= maxSpeed
-        rlSpeed /= maxSpeed
-        rrSpeed /= maxSpeed
-        fsSpeed /= maxSpeed
-        bsSpeed /= maxSpeed
+        # Unpack back
+        fl, fr, rl, rr, fs, bs = speeds
 
-        frSpeed *= self.maxWhealSpeed
-        flSpeed *= self.maxWhealSpeed
-        rlSpeed *= self.maxWhealSpeed
-        rrSpeed *= self.maxWhealSpeed
-        fsSpeed *= self.maxWhealSpeed
-        bsSpeed *= self.maxWhealSpeed
-
-        self.dumbVelocityDrive(flSpeed, frSpeed, rlSpeed, rrSpeed, fsSpeed, bsSpeed)
+        # Send to motor control
+        self.dumbVelocityDrive(fl, fr, rl, rr, fs, bs)
 
     def fieldCentricDrive(
         self,
         forward: float,
         strafe: float,
         rotation: float,
-    ):
+    ) -> None:
         # Boost strafe if needed
         strafeBoost = 2.0
         strafe *= strafeBoost
 
         # Field-oriented translation
-        strafeFC, forwardFC = self.rotateVector(strafe, forward, imu.heading())
+        strafeFC, forwardFC = self.rotateVector(strafe, forward, self.imu.heading())
 
         self.arcadeDrive(forwardFC, strafeFC, rotation)
 
@@ -697,48 +773,77 @@ class HDrive:
     ):
         # PID computes rotation power to reach target angle
         rotation = self.headingPID.update(measured=imu.heading(), setpoint=targetAngle)
-        brain.screen.print_at(targetAngle, x=40, y=160)
-        brain.screen.print_at(imu.heading(), x=40, y=180)
+
         # brain.screen.print_at(imu.heading(), x=100, y=40)
         self.fieldCentricDrive(forward, strafe, rotation)
 
     def driveController(self, controller: Controller):
-        self.arcadeDrive(
-            controller.axis3.position(),
-            controller.axis1.position(),
-            controller.axis4.position(),
-        )
+        driveModes = [
+            "arcadeDrive",
+            "fieldCentricDrive",
+            "fieldCentric0AngleDrive",
+            "fieldCentricTargetAngleDrive",
+        ]
 
-        # self.fieldCentricDrive(
-        #     controller.axis3.position(),
-        #     controller.axis4.position(),
-        #     controller.axis1.position(),
-        # )
+        # if controller.buttonA.pressed():
+        #     self.controlerIndex = (self.controlerIndex + 1) % len(driveModes)
+        #     controller.screen.clear_screen()
+        #     controller.screen.print(driveModes[self.controlerIndex])
 
-        # self.fieldCentricTargetAngleDrive(
-        #     controller.axis3.position(),
-        #     controller.axis4.position(),
-        #     0,
-        # )
+        current_mode = driveModes[0]
 
-        # self.fieldCentricTargetAngleDrive(
-        #     controller.axis3.position(),
-        #     controller.axis4.position(),
-        #     self.joystickToAngleDeg(
-        #         controller.axis1.position(), controller.axis1.position()
-        #     ),
-        # )
+        if current_mode == "fieldCentricDrive":
+            self.fieldCentricDrive(
+                controller.axis3.position(),
+                controller.axis4.position(),
+                controller.axis1.position(),
+            )
+        elif current_mode == "fieldCentric0AngleDrive":
+            self.fieldCentricTargetAngleDrive(
+                controller.axis3.position(),
+                controller.axis4.position(),
+                0,
+            )
+        elif current_mode == "fieldCentricTargetAngleDrive":
+            self.fieldCentricTargetAngleDrive(
+                controller.axis3.position(),
+                controller.axis4.position(),
+                self.joystickToAngleDeg(
+                    controller.axis1.position(), controller.axis1.position()
+                ),
+            )
+        else:
+            self.arcadeDrive(
+                controller.axis3.position(),
+                controller.axis1.position(),
+                controller.axis4.position(),
+            )
 
     # center of robot
-    def driveToPosition(self, posX: float, posY: float, targetAngle: float):
+    def driveToPosition(self, target: Pose2D, speed: float = 50.0):
         pose: Pose2D = self.odometry.getPosition()
 
-        forward = self.positionPIDY.update(pose.x, posY)
-        strafe = self.positionPIDX.update(pose.y, posX)
+        forward = self.positionPIDY.update(pose.x, target.x)
+        strafe = self.positionPIDX.update(pose.y, target.y)
 
-        self.fieldCentricTargetAngleDrive(forward, strafe, targetAngle)
+        self.fieldCentricTargetAngleDrive(forward, strafe, target.heading)
 
         return self.positionPIDY.atGoal(pose.y) and self.positionPIDY.atGoal(pose.x)
+
+    def followPath(self, path: list[Pose2D], speed: float = 50.0):
+        pass
+        """Follow a path from start to goal."""
+        # for target in path:
+        #     while not self.driveToPosition(target):
+        #         pass
+        #     print(f"Arrived at {target.x}, {target.y}")
+
+        # print("Path following complete!")
+
+    def pathFindToPosition(self, target: Pose2D, speed: float = 50.0):
+        path = self.pathFinding.a_star_pose2d(odometry.getPosition(), target)
+        print(path)
+        self.followPath(path)
 
 
 class Arm:
@@ -755,10 +860,35 @@ class Arm:
         # vertical -680
         # other horizontal -1250
         if controller.buttonA:
-            self.PIDArm.setSetpoint(-1250)
+            self.PIDArm.setSetpoint(-680)
+        if controller.buttonB:
+            self.PIDArm.setSetpoint(-340)
+        if controller.buttonX:
+            self.PIDArm.setSetpoint(0)
+
+        self.armMotor.spin(
+            FORWARD, self.PIDArm.update(self.armMotor.position(DEGREES)), RPM
+        )
+
+
+class Elevator:
+    def __init__(self, brain: Brain):
+        # For logging
+        self.brain: Brain = brain
+        self.driveRatio = 4
+        self.armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
+
+        self.PIDArm = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+
+    def pidControl(self, controller: Controller):
+        # horizontal 0
+        # vertical -680
+        # other horizontal -1250
         if controller.buttonA:
             self.PIDArm.setSetpoint(-680)
-        if controller.buttonA:
+        if controller.buttonB:
+            self.PIDArm.setSetpoint(-340)
+        if controller.buttonX:
             self.PIDArm.setSetpoint(0)
 
         self.armMotor.spin(
@@ -776,27 +906,44 @@ fruitPickingStrategy = [
     "Small_Orange",
 ]
 
-blocked: list[tuple[int, int]] = [
-    (3, 1),
-    (3, 3),
-    (2, 2),
-    (3, 7),
-    (2, 8),
-    (2, 5),
-    (4, 6),
-]
+# Create a field size (width, height) for the grid (2 in grid)
+fieldSize = (58, 39)  # 146x98 / 2.5
 
-treeBranchLocations: dict[str, list[tuple[int]]] = {
-    "Green": [(4, 9), (3, 9), (2, 9)],
-    "Yellow": [(4, 8), (3, 8), (2, 8)],
-}
+
+# Define the obstacles as Pose2D objects
+def generatePoseList(
+    coords: list[tuple[int, int]], heading: float = 0.0
+) -> set[Pose2D]:
+    return {Pose2D(x, y, heading) for x, y in coords}
+
+
+def generatePoseRec(
+    x_range: range, y_range: range, heading: float = 0.0
+) -> set[Pose2D]:
+    return {Pose2D(x, y, heading) for x in x_range for y in y_range}
+
+
+obstacles: set[Pose2D] = set()
+# obstacles |= generatePoseList(
+#     [
+#         (16, 12),
+#         (16, 19),
+#         (16, 26),
+#         (31, 12),
+#         (31, 19),
+#         (31, 26),
+#         (45, 12),
+#         (45, 19),
+#         (45, 26),
+#     ]
+# )
+# obstacles |= generatePoseRec(range(20, 28), range(17, 22))
+# obstacles |= generatePoseRec(range(35, 42), range(17, 22))
 
 # CENTER OF TAG!!!
+# inches
 tagMap: dict[int, Pose2D] = {
     1: Pose2D(0, 0, 0),
-    2: Pose2D(300, 0, 0),
-    3: Pose2D(0, 300, 0),
-    4: Pose2D(300, 300, 0),
 }
 
 
@@ -812,11 +959,13 @@ controller = Controller(PRIMARY)
 
 # Classes
 vision = VisionFruit(brain, tagMap)
-field = PathFinding(brain, 20, 50, blocked)
 odometry = Odometry(brain, vision)
-hDrive = HDrive(brain, field, imu, lineLeft, lineRight)
-arm = Arm(brain)
 
+hDrive = HDrive(brain, odometry, imu, lineLeft, lineRight)
+
+# arm = Arm(brain)
+
+elevator = Elevator(brain)
 # ------------------------  calibrate shit here and zero
 
 brain.screen.print("Calibrating")
@@ -831,6 +980,7 @@ while imu.is_calibrating():
     wait(5)
 
 brain.timer.clear()
+
 imu.set_heading(0, DEGREES)
 imu.set_rotation(0, DEGREES)
 
@@ -838,7 +988,10 @@ brain.screen.print("Finished Calibrating")
 
 # ---------------------------   RUN CODE HERE
 while True:
-    odometry.update()
+    pass
+    # odometry.update()
+    # brain.screen.print_at(odometry.getPosition(), x=40, y=40)
+    # hDrive.driveController(controller)
+    # arm.pidControl(controller)
 
-    hDrive.driveController(controller)
-    arm.pidControl(controller)
+    # hDrive.pathFindToPosition(Pose2D(44, 23))
