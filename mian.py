@@ -1,4 +1,3 @@
-# endregion VEXcode Generated Robot Configuration
 from vex import *
 from math import *
 
@@ -27,13 +26,53 @@ class Transform2D:
     def __init__(self, dX, dY, dTheta=0):
         self.dX: float = dX
         self.dY: float = dY
-        self.dTheta: float = dTheta
+        self.dTheta: float = dTheta % 360
 
-    def inverse(self):
+    def __repr__(self):
+        return (
+            "Transform2D(dX="
+            + str(self.dX)
+            + ", dY="
+            + str(self.dY)
+            + ", dTheta="
+            + (self.dTheta)
+        )
+
+    def __eq__(self, other: "Transform2D"):
+        return (
+            isinstance(other, Transform2D)
+            and isclose(self.dX, other.dX)
+            and isclose(self.dY, other.dY)
+            and isclose(self.dTheta % 360, other.dTheta % 360)
+        )
+
+    def __add__(self, other: "Transform2D") -> "Transform2D":
+        if not isinstance(other, Transform2D):
+            return NotImplemented
+
+        # Rotate other's translation by self's heading
+        angle_rad = radians(self.dTheta)
+        rotated_dx = cos(angle_rad) * other.dX - sin(angle_rad) * other.dY
+        rotated_dy = sin(angle_rad) * other.dX + cos(angle_rad) * other.dY
+
+        # Combine translations and rotations
+        new_dx = self.dX + rotated_dx
+        new_dy = self.dY + rotated_dy
+        new_dtheta = (self.dTheta + other.dTheta) % 360
+
+        return Transform2D(new_dx, new_dy, new_dtheta)
+
+    def __hash__(self):
+        return hash((self.dX, self.dY, self.dTheta))
+
+    def inverse(self) -> "Transform2D":
         angle_rad = radians(-self.dTheta)
         new_dx = -cos(angle_rad) * self.dX - sin(angle_rad) * self.dY
         new_dy = sin(angle_rad) * self.dX - cos(angle_rad) * self.dY
         return Transform2D(new_dx, new_dy, -self.dTheta)
+
+    def norm(self) -> float:
+        return (self.dX**2 + self.dY**2) ** 0.5
 
 
 class Pose2D:
@@ -49,12 +88,22 @@ class Pose2D:
         newHeading = (self.heading + transform2D.dTheta) % 360
         return Pose2D(newX, newY, newHeading)
 
-    def __eq__(self, other):
+    def __sub__(self, other: "Pose2D") -> Transform2D:
+        dx = self.x - other.x
+        dy = self.y - other.y
+        dTheta = (self.heading - other.heading) % 360
+        rad = radians(-other.heading)
+        # Rotate into other's frame
+        relDX = cos(rad) * dx - sin(rad) * dy
+        relDY = sin(rad) * dx + cos(rad) * dy
+        return Transform2D(relDX, relDY, dTheta)
+
+    def __eq__(self, other: "Pose2D"):
         return (
             isinstance(other, Pose2D)
-            and self.x == other.x
-            and self.y == other.y
-            and self.heading == other.heading
+            and isclose(self.x, other.x)
+            and isclose(self.y, other.y)
+            and isclose(self.heading % 360, other.heading % 360)
         )
 
     def __hash__(self):
@@ -65,33 +114,32 @@ class Pose2D:
             return NotImplemented
         return (self.x, self.y, self.heading) < (other.x, other.y, other.heading)
 
-    def __repr__(self):
+    def toString(self):
         return (
             "Pose2D(x="
             + str(self.x)
-            + ","
+            + ", y="
             + str(self.y)
-            + ","
+            + ", heading="
             + str(self.heading)
             + ")"
         )
 
+    def normalizeAngle(self, degrees) -> None:
+        return degrees % 360
 
-# -------------------------  Consts
-# Cardinal movements
-CARDINAL_DIRECTIONS = {
-    "N": Transform2D(0, -1),
-    "S": Transform2D(0, 1),
-    "E": Transform2D(1, 0),
-    "W": Transform2D(-1, 0),
-}
+    def transformBy(self, transform: Transform2D) -> "Pose2D":
+        return self + transform
 
-DIAGONAL_DIRECTIONS = {
-    "NE": Transform2D(1, -1),
-    "SE": Transform2D(1, 1),
-    "SW": Transform2D(-1, 1),
-    "NW": Transform2D(-1, -1),
-}
+    def distanceTo(self, other: "Pose2D") -> float:
+        return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
+
+    def headingTo(self, other: "Pose2D") -> float:
+        from math import atan2, degrees
+
+        dx = other.x - self.x
+        dy = other.y - self.y
+        return degrees(atan2(dy, dx)) % 360
 
 
 # ----------------------------- control classes
@@ -133,19 +181,31 @@ class PID:
     # to control heading/Continuous control stems
     def warpError(self, error: float) -> float:
         range = self.maximumInput - self.minimumInput
-        return (error + range / 2) % range - range / 2
+        error = (error + range / 2) % range - range / 2
+        return error
 
-    def setSetpoint(self, newSetpoint: float):
+    def setSetpoint(self, newSetpoint: float, reset: bool = True) -> None:
         self.setpoint: float = newSetpoint
-        self.integral: float = 0.0
-        self.lastError: float = 0.0
+        if reset:
+            self.reset()
+
+    def reset(self) -> None:
+        self.integral = 0.0
+        self.lastError = 0.0
+        self.lastTime = 0
 
     def getSetpoint(self) -> float:
         return self.setpoint
 
     def update(self, measured: float, setpoint: float = None) -> float:
-        dt: float = self.brain.timer.system() - self.lastTime
-        self.lastTime: float = self.brain.timer.system()
+        currentTime = self.brain.timer.system()
+
+        if self.lastTime == 0:
+            self.lastTime = currentTime
+            return 0.0
+
+        dt = currentTime - self.lastTime
+        self.lastTime = currentTime
 
         if setpoint is not None:
             self.setpoint = setpoint
@@ -170,233 +230,11 @@ class PID:
 
         return P + I + D
 
-    def atGoal(self, measured_value) -> bool:
-        return abs(self.setpoint - measured_value) <= self.tolerance
-
-
-# class AStarSolver:
-#     def __init__(
-#         self,
-#         fieldSize: Tuple[int, int],
-#         robotRadius: float = 0.5,
-#         obstacles: set[Pose2D] = set(),
-#     ):
-#         self.fieldSize: float = fieldSize
-#         self.robotRadius: float = robotRadius
-#         self.lastObstacles: set[Pose2D] = obstacles
-
-#         self.inflatedObstacles: set[Pose2D] = set()
-#         self.inflatedObstacles: set[Pose2D] = self.inflateObstacles(self.lastObstacles)
-
-#         self.turn_penalty = 10
-#         self.wall_penalty = 4
-#         self.move_penalty = 1
-#         self.diagonal_penalty = 2.5
-#         self.obstacles_penalty = 3
-
-#     def inflateObstacles(self, obstacles: set[Pose2D]) -> set[Pose2D]:
-#         pass
-
-#     #     """Inflate obstacles and store them in memory only when obstacles change."""
-#     #     # If the obstacles haven't changed, return the cached inflated obstacles
-#     #     if obstacles == self.lastObstacles and self.inflatedObstacles:
-#     #         return self.inflatedObstacles
-
-#     #     inflated = set()
-#     #     inflationRange = ceil(self.robotRadius)
-
-#     #     for obs in obstacles:
-#     #         for dx in range(-inflationRange, inflationRange + 1):
-#     #             for dy in range(-inflationRange, inflationRange + 1):
-#     #                 if abs(dx) + abs(dy) <= inflationRange:
-#     #                     inflatedX = obs.x + dx
-#     #                     inflatedY = obs.y + dy
-#     #                     if (
-#     #                         0 <= inflatedX < self.fieldSize[0]
-#     #                         and 0 <= inflatedY < self.fieldSize[1]
-#     #                     ):
-#     #                         inflated.add(Pose2D(inflatedX, inflatedY, obs.heading))
-
-#     #     # Update the cached values
-#     #     self.inflatedObstacles = inflated
-#     #     self.lastObstacles = obstacles  # Store the current obstacles for comparison
-#     #     return inflated
-
-#     # def heuristic(self, a: Pose2D, b: Pose2D) -> float:
-#     #     """Calculate Manhattan distance heuristic."""
-#     #     distance = abs(a.x - b.x) + abs(a.y - b.y)
-#     #     return distance
-
-#     # def simplifyPathWithDiagonals(self, path: list[Pose2D]) -> list[Pose2D]:
-#     #     """Simplify the path by removing unnecessary waypoints, including diagonal directions."""
-#     #     if len(path) < 3:
-#     #         return path
-
-#     #     simplified = [path[0]]
-
-#     #     def direction(a: Pose2D, b: Pose2D) -> Tuple[int, int]:
-#     #         dx = b.x - a.x
-#     #         dy = b.y - a.y
-#     #         return (dx, dy)
-
-#     #     prev_dir = direction(path[0], path[1])
-
-#     #     for i in range(1, len(path) - 1):
-#     #         curr_dir = direction(path[i], path[i + 1])
-#     #         if curr_dir != prev_dir:
-#     #             simplified.append(path[i])
-#     #             prev_dir = curr_dir
-
-#     #     simplified.append(path[-1])
-#     #     return simplified
-
-#     # def printGrid(self, path: list[Pose2D], start: Pose2D, goal: Pose2D) -> None:
-#     #     pass
-#     #     # """Print grid with obstacles, path, and start/goal, including axis numbers (double-digit safe)."""
-#     #     # width, height = self.fieldSize
-#     #     # grid = [[" " for _ in range(width)] for _ in range(height)]
-
-#     #     # def clamp(value, max_val):
-#     #     #     return max(0, min(int(value), max_val - 1))
-
-#     #     # # Place inflated obstacles
-#     #     # for obs in self.inflatedObstacles:
-#     #     #     x = clamp(obs.x, width)
-#     #     #     y = clamp(obs.y, height)
-#     #     #     grid[y][x] = "#"
-
-#     #     # # Place original obstacles
-#     #     # for obs in self.lastObstacles:
-#     #     #     x = clamp(obs.x, width)
-#     #     #     y = clamp(obs.y, height)
-#     #     #     grid[y][x] = "X"
-
-#     #     # # Place path
-#     #     # for pose in path:
-#     #     #     x = clamp(pose.x, width)
-#     #     #     y = clamp(pose.y, height)
-#     #     #     grid[y][x] = "*"
-
-#     #     # # Place start and goal
-#     #     # sx = clamp(start.x, width)
-#     #     # sy = clamp(start.y, height)
-#     #     # gx = clamp(goal.x, width)
-#     #     # gy = clamp(goal.y, height)
-#     #     # grid[sy][sx] = "R"
-#     #     # grid[gy][gx] = "G"
-
-#     #     # print("\nGrid:")
-
-#     #     # # Calculate padding based on max column number
-#     #     # col_width = len(str(width - 1)) + 1  # +1 for spacing
-
-#     #     # # Print grid rows with Y-axis labels
-#     #     # for y in reversed(range(height)):
-#     #     #     row_label = f"{y:>{col_width}} |"
-#     #     #     row_data = "".join(f"{cell:>{col_width}}" for cell in grid[y])
-#     #     #     print(row_label + row_data)
-
-#     #     # # Print separator
-#     #     # print(" " * (col_width + 1) + "-" * (width * col_width))
-
-#     #     # # Print X-axis labels
-#     #     # col_numbers = " " * (col_width + 1)
-#     #     # for x in range(width):
-#     #     #     col_numbers += f"{x:>{col_width}}"
-#     #     # print(col_numbers)
-
-#     # def distance_to_obstacles(self, point: Pose2D, obstacles: Set[Pose2D]) -> float:
-#     #     """Calculate the minimum distance from a point to the nearest obstacle."""
-#     #     min_distance = float("inf")
-#     #     for obs in obstacles:
-#     #         dist = sqrt((point.x - obs.x) ** 2 + (point.y - obs.y) ** 2)
-#     #         min_distance = min(min_distance, dist)
-#     #     return min_distance
-
-#     # def is_near_boundary(self, position: Pose2D) -> bool:
-#     #     return (
-#     #         position.x == 0
-#     #         or position.x == self.fieldSize[0] - 1
-#     #         or position.y == 0
-#     #         or position.y == self.fieldSize[1] - 1
-#     #     )
-
-#     # def a_star_pose2d(
-#     #     self,
-#     #     start: Pose2D,
-#     #     goal: Pose2D,
-#     #     obstacles: Set[Pose2D] = None,
-#     # ):
-#     #     """A* algorithm to find the shortest path with penalties for turning, wall proximity, and obstacle proximity."""
-#     #     obstacles = obstacles or self.inflatedObstacles
-
-#     #     open_set = []
-#     #     heapq.heappush(open_set, (0, start, None))  # (f, position, last_direction)
-
-#     #     came_from = {}
-#     #     g_score = {(start, None): 0}
-
-#     #     while open_set:
-#     #         _, current, last_dir = heapq.heappop(open_set)
-
-#     #         if current == goal:
-#     #             path = [current]
-#     #             key = (current, last_dir)
-#     #             while key in came_from:
-#     #                 key = came_from[key]
-#     #                 path.append(key[0])
-
-#     #             # Print the grid and path
-#     #             self.printGrid(path, start, goal)
-
-#     #             # Optimize path by simplifying direction changes
-#     #             path = self.simplifyPathWithDiagonals(path)
-
-#     #             return path[::-1]
-
-#     #         for direction, delta in {
-#     #             **CARDINAL_DIRECTIONS,
-#     #             **DIAGONAL_DIRECTIONS,
-#     #         }.items():
-#     #             neighbor = current + delta
-
-#     #             if not (
-#     #                 0 <= neighbor.x < self.fieldSize[0]
-#     #                 and 0 <= neighbor.y < self.fieldSize[1]
-#     #             ):
-#     #                 continue
-#     #             if neighbor in obstacles:
-#     #                 continue
-
-#     #             # Apply penalties:
-#     #             move_cost = self.move_penalty
-
-#     #             # Extra cost for diagonal movement
-#     #             if direction in DIAGONAL_DIRECTIONS:
-#     #                 move_cost += self.diagonal_penalty
-
-#     #             # Large penalty for turning to encourage smoother motion
-#     #             if last_dir and last_dir != direction:
-#     #                 move_cost += self.turn_penalty
-
-#     #             # Smaller penalty for proximity to walls
-#     #             if self.is_near_boundary(neighbor):
-#     #                 move_cost += self.wall_penalty
-
-#     #             # Penalty for being too close to obstacles
-#     #             if self.distance_to_obstacles(neighbor, obstacles) < 2:
-#     #                 move_cost += self.obstacles_penalty
-
-#     #             tentative_g = g_score[(current, last_dir)] + move_cost
-#     #             neighbor_key = (neighbor, direction)
-
-#     #             if neighbor_key not in g_score or tentative_g < g_score[neighbor_key]:
-#     #                 came_from[neighbor_key] = (current, last_dir)
-#     #                 g_score[neighbor_key] = tentative_g
-#     #                 f_score = tentative_g + self.heuristic(neighbor, goal)
-#     #                 heapq.heappush(open_set, (f_score, neighbor, direction))
-
-#     #     return None
+    def atGoal(self, measured) -> bool:
+        error = self.setpoint - measured
+        if self.continuous:
+            error = self.warpError(error)
+        return abs(error) <= self.tolerance
 
 
 class VisionFruit:
@@ -409,24 +247,37 @@ class VisionFruit:
         self.brain: Brain = brain
 
         # fruit color configs
-        self.greenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
-        self.orangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
-        self.yellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
+        self.AIGreenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
+        self.AIOrangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
+        self.AIYellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
 
-        # camera const
+        # self.CamGreenFruit = Signature(1, 12, 167, 71, 20, 0.2)  # TODO!!!!!!!!!
+        # self.camOrangeFruit = Signature(2, 222, 66, 67, 10, 0.2)  # TODO!!!!!!!!!
+        # self.camYellowFruit = Signature(3, 166, 114, 59, 15, 0.2)  # TODO!!!!!!!!!
+
+        # AI Camera const
         self.camWidth = 320
         self.camHeight = 240
         self.camVertFOV = 68
         self.camHorizFOV = 74
         self.degPerPixelWidth = self.camHorizFOV / self.camWidth
+
         # vision config
         self.aiVision = AiVision(
             Ports.PORT14,
-            self.greenFruit,
-            self.orangeFruit,
-            self.yellowFruit,
+            self.AIGreenFruit,
+            self.AIOrangeFruit,
+            self.AIYellowFruit,
             AiVision.ALL_TAGS,
         )
+
+        # self.fruitCam = Vision(
+        #     Ports.PORT15,
+        #     50,
+        #     self.CamGreenFruit,
+        #     self.camOrangeFruit,
+        #     self.camYellowFruit,
+        # )
 
         # arrays of fruit
         self.fruitObjects: dict[str, list[Fruit]] = {}
@@ -439,8 +290,9 @@ class VisionFruit:
         self.fruitSizeTolerance = 0.05  # guess
 
         # ----------- April Tags
-        self.tagWidth: float = 10  # guess
-        self.cameraToRobot = Transform2D(-20, 10, 0)  # guess
+        self.tagWidth: float = 5 + 15 / 16  # guess
+        self.cameraToRobot = Transform2D(0, 0, 0)  # guess
+        self.fruitToRobot = Transform2D(0, 0, 0)  # guess
 
         self.tagMap = tagMap  # guess
 
@@ -532,22 +384,24 @@ class VisionFruit:
         width: float,
         angleDeg: float,
     ) -> Transform2D:
-        # Estimate distance using width of tag and focal length
-        # depth = (real_width * focal_length) / apparent_width
-        depth = (self.tagWidth * self.degPerPixelWidth) / width
+        # Correct the tag width for yaw angle
+        yaw_rad = radians(angleDeg)
+        corrected_width = width / cos(yaw_rad) if cos(yaw_rad) != 0 else float("inf")
 
-        # Convert image-plane x, y into real-world x, y at the estimated depth
-        # Assuming camera is centered at (0, 0)
+        # Estimate depth using corrected width
+        depth = (self.tagWidth * self.degPerPixelWidth) / corrected_width
+
+        # Scale x offset to real-world units
         scale = depth / self.degPerPixelWidth
         realX = x * scale
 
         return Transform2D(depth, realX, angleDeg)
 
-    def captureTags(self) -> list[dict]:
+    def captureTags(self) -> list[dict] | None:
         tags = self.aiVision.take_snapshot(AiVision.ALL_TAGS)
 
         formattedTags: list[dict] = []
-        brain.screen.print_at(formattedTags, x=40, y=60)
+        # brain.screen.print_at(formattedTags, x=40, y=60)
         if tags:
             for tag in tags:
                 tempDict = {}
@@ -558,10 +412,16 @@ class VisionFruit:
                 )
                 tempDict["vision_score"] = tag.score
                 formattedTags.append(tempDict)
+        else:
+            return None
         return formattedTags
 
-    def getRobotPoseWithTags(self) -> Pose2D:
+    def getRobotPoseWithTags(self) -> Pose2D | None:
         tags = self.captureTags()
+
+        if tags == None:
+            return None
+
         # --- Process detections ---
         weightedX = 0.0
         weightedY = 0.0
@@ -570,20 +430,22 @@ class VisionFruit:
 
         for tag in tags:
             tagID: int = tag["id"]
-            relTransform2d: Transform2D = tag["transform"]
+            cameraToTag: Transform2D = tag["transform"]
             visionScore: float = tag["vision_score"]
 
-            if tagID not in self.tagMap or visionScore <= 0:
+            # does not add tag if score is less than 25% or not in tag map
+            if tagID not in self.tagMap or visionScore <= 0.25:
                 continue
 
             tagPose = self.tagMap[tagID]
 
-            tagToCamera = relTransform2d.inverse()
+            tagToCamera = cameraToTag.inverse()
             tagToRobot = tagToCamera + self.cameraToRobot
             robotPose: Pose2D = tagPose + tagToRobot
+            # self.brain.screen.print_at(robotPose, x=30, y=50)
 
             # Distance-based score
-            distance = sqrt(relTransform2d.dX**2 + relTransform2d.dY**2)
+            distance = sqrt(cameraToTag.dX**2 + cameraToTag.dY**2)
             if distance != 0:
                 distanceScore = 1 / (distance)
             else:
@@ -608,6 +470,20 @@ class VisionFruit:
         else:
             return None
 
+    def getBestFruitLocationFruitCam(self):
+        return (Pose2D(0, 0, 0), 0)
+        # camera frame of refrance
+        # fruit = self.fruitCam.take_snapshot(self.CamGreenFruit)
+
+        # if not (fruit and len(fruit) > 0):
+        #     return None
+
+        # # makes it robot frame of refrance
+        # return (
+        #     Pose2D(fruit[0].centerX, self.fruitDist(fruit[0].centerX), 0),
+        #     fruit[0].centerY,
+        # )
+
 
 class Odometry:
     def __init__(self, brain, visionFruit: VisionFruit):
@@ -617,8 +493,12 @@ class Odometry:
         self.visionFruit: VisionFruit = visionFruit
         self.pose: Pose2D = Pose2D(0, 0, 0)
 
-    def update(self):
-        self.pose = self.visionFruit.getRobotPoseWithTags()
+    def update(self) -> Pose2D:
+        pose = self.visionFruit.getRobotPoseWithTags()
+        if pose == None:
+            return self.getPosition()
+        self.pose = pose
+        return self.getPosition()
 
     def getPosition(self) -> Pose2D:
         return self.pose
@@ -676,7 +556,7 @@ class HDrive:
         self.positionPIDX = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
         self.positionPIDY = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
 
-        self.controlerIndex = 0
+        self.controllerIndex = 0
 
     def configMotors(self):
         self.frontLeftMotor.reset_position()
@@ -698,12 +578,12 @@ class HDrive:
         return deg % 360
 
     def stop(self) -> None:
-        self.frontLeftMotor.stop(HOLD)
-        self.frontRightMotor.stop(HOLD)
-        self.backLeftMotor.stop(HOLD)
-        self.backRightMotor.stop(HOLD)
-        self.frontSideMotor.stop(HOLD)
-        self.backSideMotor.stop(HOLD)
+        self.frontLeftMotor.stop(BRAKE)
+        self.frontRightMotor.stop(BRAKE)
+        self.backLeftMotor.stop(BRAKE)
+        self.backRightMotor.stop(BRAKE)
+        self.frontSideMotor.stop(BRAKE)
+        self.backSideMotor.stop(BRAKE)
 
     def dumbVelocityDrive(
         self,
@@ -786,9 +666,9 @@ class HDrive:
         ]
 
         # if controller.buttonA.pressed():
-        #     self.controlerIndex = (self.controlerIndex + 1) % len(driveModes)
+        #     self.controllerIndex = (self.controllerIndex + 1) % len(driveModes)
         #     controller.screen.clear_screen()
-        #     controller.screen.print(driveModes[self.controlerIndex])
+        #     controller.screen.print(driveModes[self.controllerIndex])
 
         current_mode = driveModes[0]
 
@@ -831,17 +711,17 @@ class HDrive:
         return self.positionPIDY.atGoal(pose.y) and self.positionPIDY.atGoal(pose.x)
 
     def followPath(self, path: list[Pose2D], speed: float = 50.0):
-        pass
         """Follow a path from start to goal."""
-        # for target in path:
-        #     while not self.driveToPosition(target):
-        #         pass
-        #     print(f"Arrived at {target.x}, {target.y}")
+        for target in path:
+            while not self.driveToPosition(target, speed):
+                pass
+            print("Arrived at " + str(target.x) + "," + str(target.y))
 
-        # print("Path following complete!")
+        print("Path following complete!")
 
     def pathFindToPosition(self, target: Pose2D, speed: float = 50.0):
-        path = self.pathFinding.a_star_pose2d(odometry.getPosition(), target)
+        # path = self.pathFinding.a_star_pose2d(odometry.getPosition(), target)
+        path = None
         print(path)
         self.followPath(path)
 
@@ -875,25 +755,50 @@ class Elevator:
     def __init__(self, brain: Brain):
         # For logging
         self.brain: Brain = brain
-        self.driveRatio = 4
-        self.armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
+        self.driveRatio = 5
+        self.ElevatorMotor: Motor = Motor(Ports.PORT8, 18_1, True)
 
-        self.PIDArm = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+        self.PIDElevator = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
+        # NEGATIVE IS DOWN POSITIVE IS UP
 
-    def pidControl(self, controller: Controller):
-        # horizontal 0
-        # vertical -680
-        # other horizontal -1250
-        if controller.buttonA:
-            self.PIDArm.setSetpoint(-680)
-        if controller.buttonB:
-            self.PIDArm.setSetpoint(-340)
-        if controller.buttonX:
-            self.PIDArm.setSetpoint(0)
+        self.normalTorque = 10
+        self.stallTorque = 15
 
-        self.armMotor.spin(
-            FORWARD, self.PIDArm.update(self.armMotor.position(DEGREES)), RPM
+        # elevator setpoint's
+
+    def zero(self) -> None:
+        while (self.ElevatorMotor.torque(TorqueUnits.NM) - self.normalTorque) < (
+            self.stallTorque - self.normalTorque
+        ) / 2:
+            self.ElevatorMotor.spin(FORWARD, -100, RPM)
+        self.ElevatorMotor.stop(COAST)
+        self.ElevatorMotor.reset_position()
+
+    def driveMotorEncoderPID(self, rotations) -> None:
+        self.ElevatorMotor.spin_to_position(rotations, DEGREES, 200, RPM, False)
+
+    def driveFruitPicking(self, dZ: float) -> None:
+        self.spinMotor(self.PIDElevator.update(dZ))
+        return self.PIDElevator.atGoal(dZ)
+
+    def pick(self) -> None:
+        self.ElevatorMotor.spin_for(
+            FORWARD,
+            -2,
+            RotationUnits.REV,
+            200,
+            RPM,
+            False,
         )
+
+    def home(self) -> None:
+        self.driveFruitPicking(72000)
+
+    def bottom(self) -> None:
+        self.driveFruitPicking(0)
+
+    def spinMotor(self, spin) -> None:
+        self.ElevatorMotor.spin(FORWARD, spin, RPM)
 
 
 # --------------- configs and stuff
@@ -905,40 +810,6 @@ fruitPickingStrategy = [
     "Small_Yellow",
     "Small_Orange",
 ]
-
-# Create a field size (width, height) for the grid (2 in grid)
-fieldSize = (58, 39)  # 146x98 / 2.5
-
-
-# Define the obstacles as Pose2D objects
-def generatePoseList(
-    coords: list[tuple[int, int]], heading: float = 0.0
-) -> set[Pose2D]:
-    return {Pose2D(x, y, heading) for x, y in coords}
-
-
-def generatePoseRec(
-    x_range: range, y_range: range, heading: float = 0.0
-) -> set[Pose2D]:
-    return {Pose2D(x, y, heading) for x in x_range for y in y_range}
-
-
-obstacles: set[Pose2D] = set()
-# obstacles |= generatePoseList(
-#     [
-#         (16, 12),
-#         (16, 19),
-#         (16, 26),
-#         (31, 12),
-#         (31, 19),
-#         (31, 26),
-#         (45, 12),
-#         (45, 19),
-#         (45, 26),
-#     ]
-# )
-# obstacles |= generatePoseRec(range(20, 28), range(17, 22))
-# obstacles |= generatePoseRec(range(35, 42), range(17, 22))
 
 # CENTER OF TAG!!!
 # inches
@@ -986,12 +857,32 @@ imu.set_rotation(0, DEGREES)
 
 brain.screen.print("Finished Calibrating")
 
+
+def pickFruit() -> None:
+    detection = vision.getBestFruitLocationFruitCam()
+
+    if detection == None:
+        return None
+
+    pose, z = detection
+    # y forward backwards
+    # x left right
+    # z up down
+
+    newPose = odometry.getPosition() + pose
+
+    return hDrive.driveToPosition(newPose) and elevator.driveFruitPicking(z)
+
+
 # ---------------------------   RUN CODE HERE
+# elevator.zero()
+
 while True:
-    pass
-    # odometry.update()
+    odometry.update()
+    brain.screen.print_at("Location: " + odometry.getPosition().toString(), x=30, y=40)
+    wait(50)
+    # pickFruit()
+
     # brain.screen.print_at(odometry.getPosition(), x=40, y=40)
     # hDrive.driveController(controller)
     # arm.pidControl(controller)
-
-    # hDrive.pathFindToPosition(Pose2D(44, 23))
