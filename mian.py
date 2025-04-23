@@ -20,6 +20,7 @@ class Fruit:
         self.fruitColor: str = ""
         # the ratio between the width and height of the fruit
         self.widthHeightRatio: float = 0
+        self.depth = 0
 
 
 class Transform2D:
@@ -241,7 +242,6 @@ class VisionFruit:
     def __init__(
         self,
         brain: Brain,
-        tagMap: dict[int, Pose2D],
     ):
         # For logging
         self.brain: Brain = brain
@@ -250,10 +250,6 @@ class VisionFruit:
         self.AIGreenFruit = Colordesc(1, 12, 167, 71, 20, 0.2)
         self.AIOrangeFruit = Colordesc(2, 222, 66, 67, 10, 0.2)
         self.AIYellowFruit = Colordesc(3, 166, 114, 59, 15, 0.2)
-
-        # self.CamGreenFruit = Signature(1, 12, 167, 71, 20, 0.2)  # TODO!!!!!!!!!
-        # self.camOrangeFruit = Signature(2, 222, 66, 67, 10, 0.2)  # TODO!!!!!!!!!
-        # self.camYellowFruit = Signature(3, 166, 114, 59, 15, 0.2)  # TODO!!!!!!!!!
 
         # AI Camera const
         self.camWidth = 320
@@ -268,47 +264,12 @@ class VisionFruit:
             self.AIGreenFruit,
             self.AIOrangeFruit,
             self.AIYellowFruit,
-            AiVision.ALL_TAGS,
         )
 
-        # self.fruitCam = Vision(
-        #     Ports.PORT15,
-        #     50,
-        #     self.CamGreenFruit,
-        #     self.camOrangeFruit,
-        #     self.camYellowFruit,
-        # )
-
         # arrays of fruit
-        self.fruitObjects: dict[str, list[Fruit]] = {}
-
-        self.strategy: list[str] = []
-        self.strategyColors: list[str] = []
-
         self.largeFruitRatio = 1.1  # guess
         self.smallFruitRatio = 0.5  # guess
         self.fruitSizeTolerance = 0.05  # guess
-
-        # ----------- April Tags
-        self.tagWidth: float = 5 + 15 / 16  # guess
-        self.cameraToRobot = Transform2D(0, 0, 0)  # guess
-        self.fruitToRobot = Transform2D(0, 0, 0)  # guess
-
-        self.tagMap = tagMap  # guess
-
-    def setStrategy(self, strategy: list[str]):
-        self.strategy = strategy
-        self.strategyColors: list[str] = self.colorsFromStrategy(self.strategy)
-
-    def colorsFromStrategy(self, fruitPickingStrategy: list[str]) -> list[str]:
-        colors = []
-        seen = set()
-        for col in fruitPickingStrategy:
-            color = col.split("_")[1]
-            if color not in seen:
-                colors.append(color)
-                seen.add(color)
-        return colors
 
     def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
@@ -321,194 +282,35 @@ class VisionFruit:
         fruit.score = obj.score
         fruit.fruitColor = color
         fruit.widthHeightRatio = fruit.width / fruit.height
-
+        fruit.depth = 0
         return fruit
 
-    def fruitDist(self, pixelWidth, ObjectWidthIn):
+    def fruitDist(self, pixelWidth, ObjectWidthIn):  # TODO FIX
         # OLD FIX!! deferent size fruit, take fruit object
         angularWidth = self.degPerPixelWidth * pixelWidth
         return (ObjectWidthIn * 0.5) / tan(radians(angularWidth * 0.5))
 
-    # def updateFruit(self) -> bool:
-    #     """
-    #     Updates the vision-based fruit detection. Returns True if any fruit matching
-    #     the strategy is detected, otherwise False.
-    #     """
-    #     self.fruitObjects.clear()
+    def centerScreen(self, centerX, centerY) -> tuple[float, float]:
+        return (centerX - self.camWidth / 2, centerY - self.camHeight / 2)
 
-    #     colorSensors = {
-    #         "green": self.greenFruit,
-    #         "orange": self.orangeFruit,
-    #         "yellow": self.yellowFruit,
-    #     }
+    def getFruit(self) -> Fruit | None:
+        objects: list[Fruit] = []
+        for obj in self.aiVision.take_snapshot(self.AIGreenFruit):
+            objects.append(self.makeFruitFromVisionObject(obj, "green"))
+        for obj in self.aiVision.take_snapshot(self.AIOrangeFruit):
+            objects.append(self.makeFruitFromVisionObject(obj, "orange"))
+        for obj in self.aiVision.take_snapshot(self.AIYellowFruit):
+            objects.append(self.makeFruitFromVisionObject(obj, "yellow"))
 
-    #     for color, target in zip(self.strategyColors, self.strategy):
-    #         color = color.lower()
-    #         if color not in colorSensors:
-    #             continue
-
-    #         for obj in self.aiVision.take_snapshot(colorSensors[color]):
-    #             fruit = self.makeFruitFromVisionObject(obj, color)
-
-    #             # Check for large fruit
-    #             if (
-    #                 abs(fruit.widthHeightRatio - self.largeFruitRatio)
-    #                 < self.fruitSizeTolerance
-    #             ):
-    #                 self.fruitObjects.setdefault(
-    #                     f"Large_{color.capitalize()}", []
-    #                 ).append(fruit)
-
-    #             # Check for small fruit
-    #             if (
-    #                 abs(fruit.widthHeightRatio - self.smallFruitRatio)
-    #                 < self.fruitSizeTolerance
-    #             ):
-    #                 self.fruitObjects.setdefault(
-    #                     f"Small_{color.capitalize()}", []
-    #                 ).append(fruit)
-
-    #         if target in self.fruitObjects:
-    #             return True
-
-    #     return bool(self.fruitObjects)
-
-    def averageAnglesWeighted(self, degreesList: list[float], weights):
-        sumSin = sum(w * sin(radians(a)) for a, w in zip(degreesList, weights))
-        sumCos = sum(w * cos(radians(a)) for a, w in zip(degreesList, weights))
-        return degrees(atan2(sumSin, sumCos)) % 360
-
-    def cameraPlaneToTransform2d(
-        self,
-        x: float,
-        width: float,
-        angleDeg: float,
-    ) -> Transform2D:
-        # Correct the tag width for yaw angle
-        yaw_rad = radians(angleDeg)
-        corrected_width = width / cos(yaw_rad) if cos(yaw_rad) != 0 else float("inf")
-
-        # Estimate depth using corrected width
-        depth = (self.tagWidth * self.degPerPixelWidth) / corrected_width
-
-        # Scale x offset to real-world units
-        scale = depth / self.degPerPixelWidth
-        realX = x * scale
-
-        return Transform2D(depth, realX, angleDeg)
-
-    def captureTags(self) -> list[dict] | None:
-        tags = self.aiVision.take_snapshot(AiVision.ALL_TAGS)
-
-        formattedTags: list[dict] = []
-        # brain.screen.print_at(formattedTags, x=40, y=60)
-        if tags:
-            for tag in tags:
-                tempDict = {}
-
-                tempDict["id"] = tag.id
-                tempDict["transform"] = self.cameraPlaneToTransform2d(
-                    tag.centerX, tag.width, tag.angle
-                )
-                tempDict["vision_score"] = tag.score
-                formattedTags.append(tempDict)
-        else:
-            return None
-        return formattedTags
-
-    def getRobotPoseWithTags(self) -> Pose2D | None:
-        tags = self.captureTags()
-
-        if tags == None:
-            return None
-
-        # --- Process detections ---
-        weightedX = 0.0
-        weightedY = 0.0
-        weightedHeadings = []
-        weights = []
-
-        for tag in tags:
-            tagID: int = tag["id"]
-            cameraToTag: Transform2D = tag["transform"]
-            visionScore: float = tag["vision_score"]
-
-            # does not add tag if score is less than 25% or not in tag map
-            if tagID not in self.tagMap or visionScore <= 0.25:
-                continue
-
-            tagPose = self.tagMap[tagID]
-
-            tagToCamera = cameraToTag.inverse()
-            tagToRobot = tagToCamera + self.cameraToRobot
-            robotPose: Pose2D = tagPose + tagToRobot
-            # self.brain.screen.print_at(robotPose, x=30, y=50)
-
-            # Distance-based score
-            distance = sqrt(cameraToTag.dX**2 + cameraToTag.dY**2)
-            if distance != 0:
-                distanceScore = 1 / (distance)
-            else:
-                distanceScore = 0
-
-            # can add weight to make vision score have more of a impact
-            finalScore = visionScore * distanceScore
-
-            weightedX += robotPose.x * finalScore
-            weightedY += robotPose.y * finalScore
-            weightedHeadings.append(robotPose.heading)
-            weights.append(finalScore)
-        # --- Final weighted average ---
-        if weights:
-            totalWeight = sum(weights)
-            avgX = weightedX / totalWeight
-            avgY = weightedY / totalWeight
-            avg_heading = self.averageAnglesWeighted(weightedHeadings, weights)
-
-            finalPose = Pose2D(avgX, avgY, avg_heading)
-            return finalPose
-        else:
-            return None
-
-    def getBestFruitLocationFruitCam(self):
-        return (Pose2D(0, 0, 0), 0)
-        # camera frame of refrance
-        # fruit = self.fruitCam.take_snapshot(self.CamGreenFruit)
-
-        # if not (fruit and len(fruit) > 0):
-        #     return None
-
-        # # makes it robot frame of refrance
-        # return (
-        #     Pose2D(fruit[0].centerX, self.fruitDist(fruit[0].centerX), 0),
-        #     fruit[0].centerY,
-        # )
-
-
-class Odometry:
-    def __init__(self, brain, visionFruit: VisionFruit):
-        # For logging
-        self.brain: Brain = brain
-
-        self.visionFruit: VisionFruit = visionFruit
-        self.pose: Pose2D = Pose2D(0, 0, 0)
-
-    def update(self) -> Pose2D:
-        pose = self.visionFruit.getRobotPoseWithTags()
-        if pose == None:
-            return self.getPosition()
-        self.pose = pose
-        return self.getPosition()
-
-    def getPosition(self) -> Pose2D:
-        return self.pose
+        if objects:
+            return objects[0]
+        return None
 
 
 class HDrive:
     def __init__(
         self,
         brain: Brain,
-        odometry: Odometry,
         imu: Inertial,
         lineLeft: Line,
         lineRight: Line,
@@ -516,7 +318,6 @@ class HDrive:
         # For logging
         self.brain: Brain = brain
 
-        self.odometry: Odometry = odometry
         # Robot Const
 
         self.wheelBase: float = 10
@@ -699,106 +500,71 @@ class HDrive:
                 controller.axis4.position(),
             )
 
-    # center of robot
-    def driveToPosition(self, target: Pose2D, speed: float = 50.0):
-        pose: Pose2D = self.odometry.getPosition()
-
-        forward = self.positionPIDY.update(pose.x, target.x)
-        strafe = self.positionPIDX.update(pose.y, target.y)
-
-        self.fieldCentricTargetAngleDrive(forward, strafe, target.heading)
-
-        return self.positionPIDY.atGoal(pose.y) and self.positionPIDY.atGoal(pose.x)
-
-    def followPath(self, path: list[Pose2D], speed: float = 50.0):
-        """Follow a path from start to goal."""
-        for target in path:
-            while not self.driveToPosition(target, speed):
-                pass
-            print("Arrived at " + str(target.x) + "," + str(target.y))
-
-        print("Path following complete!")
-
-    def pathFindToPosition(self, target: Pose2D, speed: float = 50.0):
-        # path = self.pathFinding.a_star_pose2d(odometry.getPosition(), target)
-        path = None
-        print(path)
-        self.followPath(path)
-
-
-class Arm:
-    def __init__(self, brain: Brain):
-        # For logging
-        self.brain: Brain = brain
-        self.driveRatio = 4
-        self.armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
-
-        self.PIDArm = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
-
-    def pidControl(self, controller: Controller):
-        # horizontal 0
-        # vertical -680
-        # other horizontal -1250
-        if controller.buttonA:
-            self.PIDArm.setSetpoint(-680)
-        if controller.buttonB:
-            self.PIDArm.setSetpoint(-340)
-        if controller.buttonX:
-            self.PIDArm.setSetpoint(0)
-
-        self.armMotor.spin(
-            FORWARD, self.PIDArm.update(self.armMotor.position(DEGREES)), RPM
-        )
-
 
 class Elevator:
-    def __init__(self, brain: Brain):
-        # For logging
-        self.brain: Brain = brain
-        self.driveRatio = 5
-        self.ElevatorMotor: Motor = Motor(Ports.PORT8, 18_1, True)
+    pass
+    # def __init__(self, brain: Brain):
+    #     # For logging
+    #     self.brain: Brain = brain
+    #     self.driveRatio = 5
+    #     self.ElevatorMotor: Motor = Motor(Ports.PORT8, 18_1, False)
 
-        self.PIDElevator = PID(self.brain, Kp=75, Ki=0.0, Kd=0, tolerance=0.5)
-        # NEGATIVE IS DOWN POSITIVE IS UP
+    #     self.PIDElevator = PID(
+    #         self.brain, Kp=30, Ki=0.0, Kd=0, tolerance=0.5, setpoint=30
+    #     )
+    #     # NEGATIVE IS DOWN POSITIVE IS UP
 
-        self.normalTorque = 10
-        self.stallTorque = 15
+    #     self.stallTorque = .4
 
-        # elevator setpoint's
+    #     # elevator setpoint's
 
-    def zero(self) -> None:
-        while (self.ElevatorMotor.torque(TorqueUnits.NM) - self.normalTorque) < (
-            self.stallTorque - self.normalTorque
-        ) / 2:
-            self.ElevatorMotor.spin(FORWARD, -100, RPM)
-        self.ElevatorMotor.stop(COAST)
-        self.ElevatorMotor.reset_position()
+    # def zero(self) -> None:
+    #     while self.ElevatorMotor.torque(TorqueUnits.NM) < self.stallTorque:
+    #         self.ElevatorMotor.spin(FORWARD, -200, RPM)
+    #     self.ElevatorMotor.stop(COAST)
+    #     self.ElevatorMotor.reset_position()
+    #     brain.screen.print("zero")
 
-    def driveMotorEncoderPID(self, rotations) -> None:
-        self.ElevatorMotor.spin_to_position(rotations, DEGREES, 200, RPM, False)
+    # def driveMotorEncoderPID(self, rotations, stop: bool = False) -> None:
+    #     self.ElevatorMotor.spin_to_position(rotations, DEGREES, 200, RPM, stop)
+    #     self.brain.screen.print_at(self.ElevatorMotor.position(), x=40, y=40)
 
-    def driveFruitPicking(self, dZ: float) -> None:
-        self.spinMotor(self.PIDElevator.update(dZ))
-        return self.PIDElevator.atGoal(dZ)
+    # def driveFruitPicking(self, dZ: float) -> None:
+    #     self.spinMotor(self.PIDElevator.update(dZ))
+    #     return self.PIDElevator.atGoal(dZ)
 
-    def pick(self) -> None:
-        self.ElevatorMotor.spin_for(
-            FORWARD,
-            -2,
-            RotationUnits.REV,
-            200,
-            RPM,
-            False,
-        )
+    # def pick(self) -> None:
+    #     self.ElevatorMotor.spin_for(
+    #         FORWARD,
+    #         -2,
+    #         RotationUnits.REV,
+    #         200,
+    #         RPM,
+    #         False,
+    #     )
 
-    def home(self) -> None:
-        self.driveFruitPicking(72000)
+    # def home(self, stop: bool = False) -> None:
+    #     self.driveMotorEncoderPID(7000, stop)
 
-    def bottom(self) -> None:
-        self.driveFruitPicking(0)
+    # def bottom(self) -> None:
+    #     self.driveMotorEncoderPID(0)
 
-    def spinMotor(self, spin) -> None:
-        self.ElevatorMotor.spin(FORWARD, spin, RPM)
+    # def spinMotor(self, spin) -> None:
+    #     self.ElevatorMotor.spin(FORWARD, spin, RPM)
+
+    # def stopMotor(self) -> None:
+    #     self.ElevatorMotor.stop(COAST)
+
+
+def pickFruit():
+    fruit = vision.getFruit()
+
+    if fruit is not None:
+        x, y = vision.centerScreen(fruit.centerY, fruit.originY)
+        elevator.driveFruitPicking(y)
+        brain.screen.print_at("(x,y):" + str(x) + ", " + str(y), x=40, y=60)
+    else:
+        elevator.stopMotor()
 
 
 # --------------- configs and stuff
@@ -811,13 +577,6 @@ fruitPickingStrategy = [
     "Small_Orange",
 ]
 
-# CENTER OF TAG!!!
-# inches
-tagMap: dict[int, Pose2D] = {
-    1: Pose2D(0, 0, 0),
-}
-
-
 # ------------------------- Initial Robot and stuff
 brain = Brain()
 
@@ -829,10 +588,9 @@ lineRight = Line(brain.three_wire_port.b)
 controller = Controller(PRIMARY)
 
 # Classes
-vision = VisionFruit(brain, tagMap)
-odometry = Odometry(brain, vision)
+vision = VisionFruit(brain)
 
-hDrive = HDrive(brain, odometry, imu, lineLeft, lineRight)
+hDrive = HDrive(brain, imu, lineLeft, lineRight)
 
 # arm = Arm(brain)
 
@@ -855,34 +613,20 @@ brain.timer.clear()
 imu.set_heading(0, DEGREES)
 imu.set_rotation(0, DEGREES)
 
-brain.screen.print("Finished Calibrating")
-
-
-def pickFruit() -> None:
-    detection = vision.getBestFruitLocationFruitCam()
-
-    if detection == None:
-        return None
-
-    pose, z = detection
-    # y forward backwards
-    # x left right
-    # z up down
-
-    newPose = odometry.getPosition() + pose
-
-    return hDrive.driveToPosition(newPose) and elevator.driveFruitPicking(z)
+brain.screen.clear_screen()
 
 
 # ---------------------------   RUN CODE HERE
-# elevator.zero()
+elevator.zero()
+elevator.home(True)
+
 
 while True:
-    odometry.update()
-    brain.screen.print_at("Location: " + odometry.getPosition().toString(), x=30, y=40)
-    wait(50)
-    # pickFruit()
+    pickFruit()
+# Code to fix/add
+# fruit size detecting
+# Logging to screen
 
-    # brain.screen.print_at(odometry.getPosition(), x=40, y=40)
-    # hDrive.driveController(controller)
-    # arm.pidControl(controller)
+# line follow -> untill sensing fruit
+# go forward to fruit in gripper -> untill area in camara is large enough
+#
