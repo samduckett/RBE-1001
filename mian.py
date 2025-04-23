@@ -591,34 +591,46 @@ class Arm:
         self.driveRatio: float = (12 / 84) * (36 / 60)
 
         self.armMotor: Motor = Motor(Ports.PORT8, 18_1, True)
+        self.armMotor.set_stopping(HOLD)
 
         self.LineBucket: Line = Line(brain.three_wire_port.c)
 
-        self.PIDArm = PID(self.brain, Kp=5, Ki=0.0, Kd=0, tolerance=0.5)
+        self.zeroButtonVoltage = self.brain.three_wire_port.d.value
+
+        self.bucketServo: Servo = Servo(self.brain.three_wire_port.e)
+
+        self.PIDArm = PID(self.brain, Kp=5, Ki=0.0, Kd=0, tolerance=0.25)  # TODO TUNE
+        self.PIDArm.addClamp(-175, 175)
 
     def hasFruit(self) -> bool:
-        return self.LineBucket.reflectivity() < 67.0
+        return self.LineBucket.reflectivity() < 67.0  # TODO TUNE
 
     def spinToPose(self, pose, stop=False) -> None:
         self.armMotor.spin_to_position(pose, DEGREES, 200, RPM, stop)
 
     def zero(self) -> None:
-        while self.armMotor.torque(TorqueUnits.NM) < self.stallTorque:
-            self.armMotor.spin(FORWARD, -200, RPM)
+        while self.zeroButtonVoltage() > 3:  # TODO change voltage
+            self.armMotor.spin(FORWARD, -100, RPM)
         self.armMotor.stop(HOLD)
         self.armMotor.reset_position()
 
     def home(self):
-        pass
+        self.spinToPose(0)
 
     def fruitPicking(self):
-        pass
+        self.spinToPose(100)  # TODO fix
 
     def fruitHeight(self, dY):
-        pass
+        if dY == 0:
+            self.armMotor.stop()
+        else:
+            self.armMotor.spin(FORWARD, self.PIDArm.update(dY), RPM)
 
-    def closeBucket():
-        pass
+    def closeBucket(self):
+        self.bucketServo.set_position(0)  # TODO TUNE
+
+    def openBucket(self):
+        self.bucketServo.set_position(90)  # TODO TUNE
 
 
 # ------------------- State Machine
