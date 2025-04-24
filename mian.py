@@ -511,9 +511,7 @@ class Arm:
     def zero(self) -> None:
         if self.armMotor.temperature(PERCENT) < 47:
             # THE motor is not being limited
-            while (
-                self.armMotor.torque(TorqueUnits.NM) < 0.8
-            ):  # TODO make sure this workds when the motor is running at low current
+            while self.armMotor.torque(TorqueUnits.NM) < 0.8:
                 self.brain.screen.print_at(
                     self.armMotor.torque(TorqueUnits.NM), x=40, y=40
                 )
