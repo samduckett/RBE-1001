@@ -4,6 +4,7 @@
         "Holonomic",
         "Horiz",
         "PIDX",
-        "setpoint"
+        "setpoint",
+        "XPID"
     ]
 }
