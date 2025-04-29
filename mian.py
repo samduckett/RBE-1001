@@ -1,7 +1,6 @@
 from vex import *
 from math import *
-
-# from enum import Enum, auto
+from random import *
 
 
 # -------------- Classes that should probably only be made in java but they are here
@@ -179,6 +178,9 @@ class VisionFruit:
 
         self.objects: list[Fruit] = []
 
+        self.tags: list[AiVisionObject] = []
+        self.aiVision.tag_detection(True)
+
     def makeFruitFromVisionObject(self, obj: AiVisionObject, color: str) -> Fruit:
         fruit = Fruit()
         fruit.originX = obj.originX
@@ -195,10 +197,13 @@ class VisionFruit:
         return fruit
 
     def fruitDist(self, fruit: Fruit):
+        self.dist(self.fruitHeight, fruit.height)
 
-        distY = (self.fruitHeight * 0.5) / tan(
-            radians(self.degPerPixelHeight * fruit.height * 0.5)
-        )
+    def tagDist(self, obj: AiVisionObject):
+        self.dist(self.fruitHeight, obj.height)
+
+    def dist(self, height, objHeight):
+        distY = (objHeight * 0.5) / tan(radians(self.degPerPixelHeight * height * 0.5))
         return distY
 
     # changes origan to center of camera
@@ -217,6 +222,8 @@ class VisionFruit:
             if color == "yellow":
                 for obj in self.aiVision.take_snapshot(self.AIYellowFruit):
                     self.objects.append(self.makeFruitFromVisionObject(obj, "yellow"))
+
+        self.tags = self.aiVision.take_snapshot(self.aiVision.ALL_TAGS)
 
 
 class HDrive:
@@ -268,11 +275,11 @@ class HDrive:
 
         self.friendXPID: PID = PID(
             self.brain, Kp=2, Ki=0, Kd=0, setpoint=0, tolerance=0.5
-        )  # TODO TUne
+        )
         self.friendXPID.addClamp(-30, 30)
         self.friendYPID: PID = PID(
             self.brain, Kp=3, Ki=0, Kd=0, setpoint=0, tolerance=0.5
-        )  # TODO TUne
+        )
         self.friendYPID.addClamp(-50, 50)
 
         self.controllerIndex = 0
@@ -377,19 +384,14 @@ class HDrive:
         self.fieldCentricDrive(forward, strafe, rotation)
 
     def driveController(self, controller: Controller, index):
-        driveModes = [
-            "arcadeDrive",
-            "fieldCentricDrive",
-            "fieldCentric0AngleDrive",
-            "fieldCentricTargetAngleDrive",
-        ]
+        driveModes = {
+            "arcadeDrive": 1,
+            "fieldCentricDrive": 2,
+            "fieldCentric0AngleDrive": 3,
+            "fieldCentricTargetAngleDrive": 4,
+        }
 
-        # if controller.buttonA.pressed():
-        #     self.controllerIndex = (self.controllerIndex + 1) % len(driveModes)
-        #     controller.screen.clear_screen()
-        #     controller.screen.print(driveModes[self.controllerIndex])
-
-        current_mode = driveModes[index]
+        current_mode = list(driveModes.keys())[index]
 
         if current_mode == "fieldCentricDrive":
             self.fieldCentricDrive(
@@ -418,24 +420,11 @@ class HDrive:
                 controller.axis4.position(),
             )
 
-    def onLine(self):
-        brain.screen.print_at(self.frontLineReflectivity(), x=40, y=160)
-        brain.screen.print_at(self.backLineReflectivity(), x=40, y=180)
-        # not on line
-        # 90, 60 not on line
-        # 90, 55 on line
-        # 86, 60 on line
-        brain.screen.print_at(
-            self.frontLineOnLine(),
-            x=120,
-            y=160,
-        )
-        brain.screen.print_at(
-            self.backLineOnLine(),
-            x=120,
-            y=180,
-        )
+    def onLine(self) -> bool:
         return self.frontLineOnLine() or self.backLineOnLine()
+
+    def onCross(self) -> bool:
+        return self.frontLineOnLine() and self.backLineOnLine()
 
     def frontLineReflectivity(self):
         return self.lineFront.value(PERCENT)
@@ -449,17 +438,6 @@ class HDrive:
     def backLineOnLine(self):
         return self.backLineReflectivity() < 65
 
-    def onCross(self, tolerance: float = 0.05) -> bool:
-        """returns true if and only if both sensors are fully on a line"""
-        onLineReflectance = 50
-
-        # error of the line sensors from being on the line
-        frontError = abs(self.frontLineReflectivity() - onLineReflectance)
-        backError = abs(self.backLineReflectivity() - onLineReflectance)
-
-        # checks both sensors are with in the tolerance of being on the line
-        return frontError < tolerance and backError < tolerance
-
     def strafeLine(self, strafeSpeed, angle: float = 0):
         straddleLineReflectivity: float = 50
         Kp: float = 0.5
@@ -468,11 +446,11 @@ class HDrive:
         frontError = self.frontLineReflectivity() - straddleLineReflectivity
         backError = self.backLineReflectivity() - straddleLineReflectivity
 
-        brain.screen.print_at(frontError, x=100, y=200)
-        brain.screen.print_at(backError, x=100, y=220)
+        # brain.screen.print_at(frontError, x=100, y=200)
+        # brain.screen.print_at(backError, x=100, y=220)
 
-        brain.screen.print_at(self.frontLineReflectivity(), x=40, y=200)
-        brain.screen.print_at(self.backLineReflectivity(), x=40, y=220)
+        # brain.screen.print_at(self.frontLineReflectivity(), x=40, y=200)
+        # brain.screen.print_at(self.backLineReflectivity(), x=40, y=220)
         # front pos forward
         # back pos backwards
 
@@ -532,10 +510,9 @@ class Arm:
         self.LineBucket: Line = Line(brain.three_wire_port.b)
 
         self.bucketServo: Servo = Servo(self.brain.three_wire_port.c)
+        self.bucketServoTwo: Servo = Servo(self.brain.three_wire_port.e)
 
-        self.PIDArm = PID(
-            self.brain, Kp=-1.5, Ki=0.0, Kd=0, tolerance=0.25, setpoint=0
-        )  # TODO TUNE arm PID
+        self.PIDArm = PID(self.brain, Kp=-1.5, Ki=0.0, Kd=0, tolerance=0.25, setpoint=0)
         self.PIDArm.addClamp(-175, 175)
 
     def hasFruit(self) -> bool:
@@ -564,7 +541,7 @@ class Arm:
         else:
             # the motor is being limited
             self.armMotor.spin(FORWARD, -200, RPM)
-            wait(5000)  # drive backwards for 5 seconds and then zeros
+            wait(2000)  # drive backwards for 5 seconds and then zeros
         self.armMotor.stop(COAST)
         self.armMotor.reset_position()
 
@@ -578,25 +555,36 @@ class Arm:
         self.spinToPose(2000, pause)
 
     def atFruitPickingHeight(self):
-        return (arm.armMotor.position(DEGREES) - 2000) < 15  # TUNE
+        return abs(arm.armMotor.position(DEGREES) - 2000) < 15  # TUNE
 
     def toVisionFruitHeight(self, fruit: Fruit | None) -> bool:
         if fruit is None:
-            self.armMotor.stop()
+            self.stop()
         else:
             x, y = vision.centerScreen(fruit.centerX, fruit.centerY)
             if y == 0:
-                self.armMotor.stop()
+                self.stop()
             else:
-                self.armMotor.spin(FORWARD, self.PIDArm.update(y), RPM)
+                if (
+                    self.armMotor.torque(TorqueUnits.NM) > 1.0
+                    or self.armMotor.position(DEGREES) < 1000
+                ):  # TODO arm at vertical position
+                    self.stop
+                else:
+                    self.armMotor.spin(FORWARD, self.PIDArm.update(y), RPM)
                 return self.PIDArm.atGoal(y)
         return False
 
     def closeBucket(self):
-        self.bucketServo.set_position(-100, PERCENT)
+        self.bucketServo.set_position(150, PERCENT)
+        self.bucketServoTwo.set_position(-150, PERCENT)
 
     def openBucket(self):
-        self.bucketServo.set_position(100, PERCENT)
+        self.bucketServo.set_position(-100, PERCENT)
+        self.bucketServoTwo.set_position(100, PERCENT)
+
+    def stop(self):
+        self.armMotor.stop()
 
 
 # ------------------- State Machine
@@ -606,10 +594,19 @@ class State:
         self.fallback = fallBack
         self.color = color
 
+    def getTimeout(self):
+        return self.timeout
+
+    def getFallback(self):
+        return self.fallback
+
+    def getColor(self):
+        return self.color
+
 
 STATE: dict[str, State] = {
     "FIND_LINE": State(10.0, "ERROR", Color.WHITE),
-    "LINE_FOLLOW_TO_TREE": State(20.0, "FIND_LINE", Color.RED),
+    "LINE_FOLLOW_TO_TREE": State(20, "FIND_LINE", Color.RED),
     "GO_TO_FRUIT": State(10.0, "FIND_LINE", Color.YELLOW),
     "GRAB_FRUIT": State(5.0, "FIND_LINE", Color.GREEN),
     "BACK_TO_Line": State(5.0, "FIND_LINE", Color.ORANGE),
@@ -627,7 +624,6 @@ class StateMachine:
         drive: HDrive,
         arm: Arm,
         vision: VisionFruit,
-        debug: bool = False,
     ):
         self.state: State = STATE["FIND_LINE"]
         self.brain: Brain = brain
@@ -636,136 +632,196 @@ class StateMachine:
         self.arm: Arm = arm
         self.vision: VisionFruit = vision
 
-        self.debug = debug
-
         self.stateStartTime = self.brain.timer.system()
 
         self.fruitColors = ["green", "yellow", "orange"]
+        #              Tag ID   0        1        2
+
         self.wantedFruitColorIndex = 0
 
     def update(self):
         self.vision.update([self.fruitColors[self.wantedFruitColorIndex]])
 
-        # elapsed = self.brain.timer.system() - self.stateStartTime
-        # if self.state.timeout is not None and elapsed > self.state.timeout:
-        #     fallback: State = self.state.fallback
-        #     self.transition(fallback)
-        #     return
+        elapsed = self.brain.timer.system() - self.stateStartTime
+        if self.state.getTimeout() is not None:
+            if elapsed > self.state.getTimeout():
+                fallback: State = self.state.getFallback()
+                self.transition(fallback)
+                return
 
         # Dispatch logic
-        {
-            STATE["FIND_LINE"]: self.handleFindLine,
-            STATE["LINE_FOLLOW_TO_TREE"]: self.handleLineFollowToTree,
-            STATE["GO_TO_FRUIT"]: self.handleGoToFruit,
-            STATE["GRAB_FRUIT"]: self.handleGrabFruit,
-            STATE["BACK_TO_Line"]: self.handleBackToLine,
-            STATE["LINE_FOLLOW_TO_BIN"]: self.handleLineFollowToBin,
-            STATE["TRACK_BIN"]: self.handleTrackBin,
-            STATE["RAM_BUCKET"]: self.handleRamBucket,
-            STATE["ERROR"]: self.handleError,
-        }[self.state]()
+        runner = {
+            STATE["FIND_LINE"]: self.runFindLine,
+            STATE["LINE_FOLLOW_TO_TREE"]: self.runLineFollowToTree,
+            STATE["GO_TO_FRUIT"]: self.runGoToFruit,
+            STATE["GRAB_FRUIT"]: self.runGrabFruit,
+            STATE["BACK_TO_Line"]: self.runBackToLine,
+            STATE["LINE_FOLLOW_TO_BIN"]: self.runLineFollowToBin,
+            STATE["TRACK_BIN"]: self.runTrackBin,
+            STATE["RAM_BUCKET"]: self.runRamBucket,
+            STATE["ERROR"]: self.runError,
+        }.get(self.state)
+
+        if runner:
+            runner()
 
     def transition(self, newState: State):
-        # PRINT TO SCREEN
-        self.brain.screen.draw_rectangle(0, 120, 480, 120, newState.color)
+        self.brain.screen.draw_rectangle(0, 120, 480, 120, newState.getColor())
         self.state = newState
         self.stateStartTime = self.brain.timer.system()
+        # adding pause between states
+        wait(500)
 
-    def handleFindLine(self):
-        # drives -y to find a line at 50 percent power
-        # TODO check angle
+    def stateCheck(self, checks: dict[str, bool]) -> bool:
+        if not checks:
+            return False
+
+        width = floor(480 / len(checks))
+        done = True
+
+        for index, (name, check) in enumerate(checks.items()):
+            color = Color.GREEN if check else Color.RED
+            self.brain.screen.draw_rectangle(width * index, 0, width, 120, color)
+            self.brain.screen.print_at(name, x=width * index, y=40)
+            if check and done:
+                done = True
+            else:
+                done = False
+
+        return done
+
+    def runFindLine(self):
+        # arm out in front of robot
         self.arm.toFruitPickingHeight()
+        # drives backward
         self.drive.fieldCentricTargetAngleDrive(-30, 0, 45)
-        if self.drive.onLine():
-            self.drive.stop()
 
-        if self.drive.onLine() and self.arm.atFruitPickingHeight():
+        checks = {
+            "on Line": self.drive.onLine(),
+            "arm at hight": self.arm.atFruitPickingHeight(),
+        }
+        if self.stateCheck(checks):
+            self.drive.stop()
+            self.arm.stop()
             self.transition(STATE["LINE_FOLLOW_TO_TREE"])
 
-    def handleLineFollowToTree(self):
+    def runLineFollowToTree(self):
+        # line follows the line at a 45 so the arm can grab all of the fruit
         self.drive.strafeLine(20, 45)
+
         self.arm.openBucket()
+
         self.arm.PIDArm.setpoint = 0
-        self.arm.toFruitPickingHeight()
 
-        if vision.objects:
-            x, y = vision.centerScreen(
-                vision.objects[0].centerX, vision.objects[0].centerY
-            )
+        objects = self.vision.objects
+        if objects:
+            x, y = self.vision.centerScreen(objects[0].centerX, objects[0].centerY)
+            self.arm.toVisionFruitHeight(objects[0])
 
-            self.arm.toVisionFruitHeight(vision.objects[0])
-
-            if abs(x) < 30 and vision.objects[0].depth < 20:  # TODO tune
-
+            # if close in the x derection and close in the depth derectin go to it
+            checks = {
+                "close to fruit x": abs(x) < 30,
+                "close to fruit depth": objects[0].depth < 20,  # TODO check
+            }
+            if self.stateCheck(checks):
                 self.transition(STATE["GO_TO_FRUIT"])
 
-    def handleGoToFruit(self):
+    def runGoToFruit(self):
+        self.arm.openBucket()
 
-        if vision.objects:
-            if vision.objects[0].depth > 6:
-                self.drive.friendToFruit(vision.objects[0])
+        objects = self.vision.objects
+        if objects:
+            # gets close to fruit but does not go into gripper
+            if objects[0].depth > 6:
+                self.drive.friendToFruit(objects[0])
             else:
                 self.drive.stop()
 
-            if vision.objects[0].depth < 9:
+            # changes arm setpoint when close
+            if objects[0].depth < 9:
                 self.arm.PIDArm.setpoint = 65
 
-            if vision.objects[0].depth < 7 and self.arm.toVisionFruitHeight(
-                vision.objects[0]
-            ):
+            checks = {
+                "close to fruit depth": objects[0].depth < 7,
+                "arm at height": self.arm.toVisionFruitHeight(objects[0]),
+            }
+            if self.stateCheck(checks):
                 self.transition(STATE["GRAB_FRUIT"])
         else:
+            # if lose fruit go back to line
             self.transition(STATE["FIND_LINE"])
 
-    def handleGrabFruit(self):
-        if vision.objects:
-            self.arm.toVisionFruitHeight(vision.objects[0])
-            self.drive.friendToFruitSlow(vision.objects[0])
+    def runGrabFruit(self):
+        objects = self.vision.objects
+        if objects:
+            if self.arm.toVisionFruitHeight(objects[0]):
+                self.drive.friendToFruitSlow(objects[0])
 
-        if arm.hasFruit():
+        checks = {
+            "has fruit": self.arm.hasFruit(),
+        }
+        if self.stateCheck(checks):
             self.arm.closeBucket()
+            self.drive.stop()
+            self.arm.stop()
             self.transition(STATE["BACK_TO_Line"])
 
-    def handleBackToLine(self):
+    def runBackToLine(self):
+        # drives back to line
         self.drive.fieldCentricTargetAngleDrive(-50, 0, 45)
 
-        if not self.arm.hasFruit():
-            self.transition(STATE["FIND_LINE"])
-        elif self.drive.onLine():  # TODO CLOSE TO BIN
+        checks = {
+            "on line": self.drive.onLine(),
+        }
+        if self.stateCheck(checks):
             self.transition(STATE["LINE_FOLLOW_TO_BIN"])
 
-    def handleLineFollowToBin(self):
+    def runLineFollowToBin(self):
         self.arm.toHome()
         self.drive.strafeLine(-50, -90)
-        # spin to point in direction of bin
 
-        if not self.arm.hasFruit():
-            self.transition(STATE["FIND_LINE"])
-        elif False:  # TODO CLOSE TO BIN
-            self.transition(STATE["TRACK_BIN"])
+        tags = self.vision.tags
+        if tags:
+            dist = self.vision.tagDist(tags[0])
+            if dist < 10:
+                self.transition(STATE["TRACK_BIN"])
 
-    def handleTrackBin(self):
-        # TODO friend to bin
+    def runTrackBin(self):
+        self.drive.fieldCentricTargetAngleDrive(20, 0, -90)
+        tags = self.vision.tags
+        # Drive forwards while facing forward and depth from camera
+        # TODO: friend to bin
+        # tag center x is like 0
+        if tags:
+            fruitTag = None
+            for tag in tags:
+                if tag.id == self.wantedFruitColorIndex:
+                    fruitTag = tag
 
-        if not self.arm.hasFruit():
-            self.transition(STATE["FIND_LINE"])
-        elif False:  # TODO  ALINED WITH BIN
+            x, y = self.vision.centerScreen(fruitTag.centerX, fruitTag.centerY)
             self.transition(STATE["RAM_BUCKET"])
+        # else:
+        #     self.transition(STATE["LINE_FOLLOW_TO_BIN"])
 
-    def handleRamBucket(self):
-        # open bucket
-        # TODO go forward fast
+    def runRamBucket(self):
+        arm.openBucket()
+        self.drive.fieldCentricTargetAngleDrive(-200, 0, -90)
 
-        if not arm.hasFruit():
-            # start searching for next fruit color
-            self.wantedFruitColorIndex += 1
-            self.wantedFruitColorIndex = self.wantedFruitColorIndex % self.fruitColors
-
+        if not self.arm.hasFruit():
+            self.wantedFruitColorIndex = (self.wantedFruitColorIndex + 1) % len(
+                self.fruitColors
+            )
             self.transition(STATE["FIND_LINE"])
 
-    def handleError(self):
-        if False:
-            self.transition(STATE["FIND_LINE"])
+    def runError(self):
+        # Could add error recovery
+        self.drive.arcadeDrive(
+            50 * random(),
+            50 * random(),
+            50 * random(),
+        )
+        wait(1000)
+        self.transition(STATE["FIND_LINE"])
 
 
 # ------------------------- Initial Robot and stuff
@@ -810,29 +866,32 @@ imu.set_rotation(0, DEGREES)
 wait(1500)
 brain.screen.print("Ready TO Pick Fruit")
 # --------------- Drive up ramp
+if True:
+    while imu.orientation(ROLL, DEGREES) > 8:
+        hDrive.strafeLine(150)
 
-while imu.orientation(ROLL, DEGREES) > 8:
-    hDrive.strafeLine(150)
+    t = brain.timer.system()
+    # drvies forward for 1.5 seconds and then cheks if on line
+    while (not hDrive.onLine()) or (brain.timer.system() - t) < 1500:
+        hDrive.fieldCentricTargetAngleDrive(0, 30, -90)
 
-t = brain.timer.system()
-# drvies forward for 1.5 seconds and then cheks if on line
-while (not hDrive.onLine()) or (brain.timer.system() - t) < 1500:
-    hDrive.fieldCentricTargetAngleDrive(0, 30, -90)
+    hDrive.stop()
 
-hDrive.stop()
+    imu.calibrate()
+    while imu.is_calibrating():
+        wait(5)
 
-imu.calibrate()
-while imu.is_calibrating():
-    wait(5)
-
-imu.set_heading(0, DEGREES)
-imu.set_rotation(0, DEGREES)
-
-arm.toFruitPickingHeight(True)
-
+    imu.set_heading(0, DEGREES)
+    imu.set_rotation(0, DEGREES)
+    arm.toFruitPickingHeight(True)
 # ---------------------------   RUN CODE HERE
 while True:
     stateMachine.update()
+    # if controller.buttonA.pressing():
+    #     arm.openBucket()
+    # if controller.buttonB.pressing():
+    #     arm.closeBucket()
+
     # hDrive.strafeLine(20, 45)
     # vision.update(["green"])
     # if vision.objects:
