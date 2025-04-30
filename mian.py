@@ -642,7 +642,7 @@ class StateMachine:
         self.fruitColorsForScreen = [Color.GREEN, Color.YELLOW, Color.YELLOW]
         #              Tag ID   0        1        2
 
-        self.wantedFruitColorIndex = 0
+        self.wantedFruitColorIndex = 1
 
         self.setFruitColor()
 
@@ -723,6 +723,8 @@ class StateMachine:
             self.brain.screen.print_at(name, x=boxWidth * index + 10, y=20)
             if not check:
                 done = False
+
+        self.lastChecks = checks
 
         return done
 
@@ -814,7 +816,7 @@ class StateMachine:
 
     # a slower drive sqance that grabs fruit
     def runGrabFruit(self):
-        self.arm.PIDArm.setpoint = 67
+        self.arm.PIDArm.setpoint = 68
         objects = self.vision.objects
         if objects:
             if self.arm.toVisionFruitHeight(objects[0]):
@@ -906,7 +908,7 @@ class StateMachine:
     # rambs the robot into the bucket
     def runRamBucket(self):
         arm.openBucket()
-        self.drive.fieldCentricTargetAngleDrive(0, -100, -90)
+        self.drive.fieldCentricTargetAngleDrive(0, -50, -90)
 
         checks = {
             "not has fruit": not self.arm.hasFruit(),
@@ -971,33 +973,61 @@ brain.screen.print("Ready TO Pick Fruit")
 # Line follow up the ramp -> till cross -> Off ramp
 # Drive to next line -> till see next line
 # Zero IMU -> till completion
-if True:
-    while imu.orientation(ROLL, DEGREES) > 8:
-        hDrive.strafeLine(150)
+# if True:
+#     while imu.orientation(ROLL, DEGREES) > 8:
+#         hDrive.strafeLine(150)
 
-    t = brain.timer.system()
-    # drives forward for 1.5 seconds and then checks if on line to get of the start line
-    while (brain.timer.system() - t) < 1500:
-        hDrive.fieldCentricTargetAngleDrive(40, 0, -90)
+#     t = brain.timer.system()
+#     # drives forward for 1.5 seconds and then checks if on line to get of the start line
+#     while (brain.timer.system() - t) < 1500:
+#         hDrive.fieldCentricTargetAngleDrive(40, 0, -90)
 
-    while (not hDrive.onLine()) or (brain.timer.system() - t) < 3000:
-        hDrive.fieldCentricTargetAngleDrive(0, 40, -90)
+#     while (not hDrive.onLine()) or (brain.timer.system() - t) < 3000:
+#         hDrive.fieldCentricTargetAngleDrive(0, 40, -90)
 
-    hDrive.stop()
+#     hDrive.stop()
 
-    imu.calibrate()
-    while imu.is_calibrating():
-        wait(5)
+#     imu.calibrate()
+#     while imu.is_calibrating():
+#         wait(5)
 
-    imu.set_heading(0, DEGREES)
-    imu.set_rotation(0, DEGREES)
-arm.toFruitPickingHeight(True)
+#     imu.set_heading(0, DEGREES)
+#     imu.set_rotation(0, DEGREES)
+# arm.toFruitPickingHeight(True)
 # ---------------------------   RUN CODE HERE
 
-# use for debuggin to jump states
-# stateMachine.transition(STATE["BACK_TO_Line"])
-toggle = True
 while True:
-    stateMachine.update()
+    brain.screen.print_at(arm.armMotor.position(), x=20, y=20)
+    # stateMachine.update()
 
-    controller.buttonA.pressed(stateMachine.nextFruit)
+    # controller.buttonA.pressed(stateMachine.nextFruit)
+    # if controller.buttonA.pressing():
+    #     arm.openBucket()
+    # if controller.buttonB.pressing():
+    #     arm.closeBucket()
+
+
+# Things to Fix
+# - For find line arm should be homed
+# - Turn 45 slowly
+# - Yellows first
+# - Find tree X smaller
+# - Add longer pause between friend states
+# - Second friend needs to be slower
+# - Tune Y direction to be slower
+# - Up + Down arm needs tuning for second friend
+# - Go up to set point, hold, do not adjust arm
+# - When returning to line, arcade drive backwards (backwards relative to robot) **NOT FOR GREEN FRUIT
+# - Arm goes to home, then turn
+# - Tune bucket drop, arm is too low
+# - Back robot up before finding line when fruit is dropped
+# - Find line on a 90 not a 45
+# - Tune Orange
+# - Adjust state timeouts
+# - Fix fruit color on display
+# - Add fall back, if failed 3 fruit attempts, move to next color
+# - Fruit distance on line follow decrease
+# - add after deposit retern to line on square
+# - back to line arcade drive bacward
+# - add positoin clamp arm
+# - **add arm stop when stall make change in derection mut be diffrent
